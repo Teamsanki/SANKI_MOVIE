@@ -68,6 +68,7 @@ def add_download_link(client, message):
     message.reply(f"✅ Download link added for {movie_name}.")
 
 # Play VC Command (Play Movie in Voice Chat)
+# Play VC Command (Play Movie in Voice Chat)
 @bot.on_message(filters.command("playvc"))
 def play_vc(client, message):
     args = message.text.split(maxsplit=2)
@@ -85,11 +86,10 @@ def play_vc(client, message):
     movie_link = movie["vc_link"]
     group_id = message.chat.id
 
-    # Play movie in VC
+    # Play movie in VC (removed bot_id)
     pytgcalls.join_group_call(
         chat_id=group_id,
-        stream=AudioVideoPiped(movie_link),
-        bot_id=ASSISTANT_ID  # Use assistant ID for the VC stream
+        stream=AudioVideoPiped(movie_link)
     )
 
     # Log the play action to the logger group
@@ -101,7 +101,7 @@ def play_vc(client, message):
         f"📌 Group: {message.chat.title} (ID: {group_id})",
     )
     message.reply(f"Playing {movie_name} in VC...")
-
+    
 # Start Command (Channel Check)
 @bot.on_message(filters.command("start"))
 def start(client, message):
