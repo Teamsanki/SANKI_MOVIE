@@ -1,8 +1,6 @@
 import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioVideoPiped
 import pymongo
 from datetime import datetime
 
@@ -14,201 +12,178 @@ MONGO_URI = "mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retry
 CHANNEL_LINK = "https://t.me/matalbi_duniya"  # Replace with your actual channel link
 OWNER_ID = 7877197608  # Replace with the actual Owner ID
 LOGGER_GROUP = -1002100433415  # Replace with your actual log group ID
-ASSISTANT_ID = 7912035011  # Replace with your assistant ID (ID of the bot used for streaming)
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-pytgcalls = PyTgCalls(bot)
 
 # MongoDB Setup
 client = pymongo.MongoClient(MONGO_URI)
 db = client["telegram_movie_bot"]
-movies_collection = db["movies"]
 download_links_collection = db["download_links"]
+stats_collection = db["stats"]
 
-# Add Movie VC Link Command (Owner Only)
-@bot.on_message(filters.command("addvc") & filters.user(OWNER_ID))
-def add_vc_link(client, message):
-    args = message.text.split(maxsplit=2)
-    if len(args) < 3:
-        message.reply("Usage: /addvc <Movie Name> <Link>")
-        return
-
-    movie_name = args[1]
-    link = args[2]
-
-    # Insert or update movie VC link in database
-    movies_collection.update_one(
-        {"movie_name": movie_name},
-        {"$set": {"vc_link": link}},
-        upsert=True
-    )
-
-    message.reply(f"✅ VC Link added for {movie_name}.")
-
-# Add Movie Download Link Command (Owner Only)
-@bot.on_message(filters.command("addlink") & filters.user(OWNER_ID))
-def add_download_link(client, message):
-    args = message.text.split(maxsplit=2)
-    if len(args) < 3:
-        message.reply("Usage: /addlink <Movie Name> <Download Link>")
-        return
-
-    movie_name = args[1]
-    download_link = args[2]
-
-    # Insert or update download link in the database
-    download_links_collection.update_one(
-        {"movie_name": movie_name},
-        {"$set": {"download_link": download_link}},
-        upsert=True
-    )
-
-    message.reply(f"✅ Download link added for {movie_name}.")
-
-# Play VC Command (Play Movie in Voice Chat)
-# Play VC Command (Play Movie in Voice Chat)
-@bot.on_message(filters.command("playvc"))
-def play_vc(client, message):
-    args = message.text.split(maxsplit=2)
-    if len(args) < 2:
-        message.reply("Usage: /playvc <Movie Name>")
-        return
-
-    movie_name = args[1]
-    movie = movies_collection.find_one({"movie_name": movie_name})
-
-    if not movie or "vc_link" not in movie:
-        message.reply(f"Movie '{movie_name}' not found or no VC link available.")
-        return
-
-    movie_link = movie["vc_link"]
-    group_id = message.chat.id
-
-    # Play movie in VC (removed bot_id)
-    pytgcalls.join_group_call(
-        chat_id=group_id,
-        stream=AudioVideoPiped(movie_link)
-    )
-
-    # Log the play action to the logger group
-    client.send_message(
-        LOGGER_GROUP,
-        f"🎥 **Movie Played in VC**:\n\n"
-        f"👤 User: [{message.from_user.first_name}](tg://user?id={message.from_user.id})\n"
-        f"🎬 Movie: {movie_name}\n"
-        f"📌 Group: {message.chat.title} (ID: {group_id})",
-    )
-    message.reply(f"Playing {movie_name} in VC...")
-    
-# Start Command (Channel Check)
+# Start Command (Channel Check and Inline Channel Button)
 @bot.on_message(filters.command("start"))
 def start(client, message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
-    # Skip channel check for the owner
-    if user_id == OWNER_ID:
-        message.reply_photo(
-            photo="https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg",  # Replace with your image URL
-            caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("Owner Support", url=f"tg://user?id={OWNER_ID}")],
-                    [InlineKeyboardButton("Movies", callback_data="movies")]
-                ]
-            ),
-        )
-        return
-
-    # Check if user has joined the channel
-    try:
-        member = client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id)
-        if member.status not in ["member", "administrator", "creator"]:
-            message.reply(
-                "Please join our channel to use the bot!",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]]
-                ),
-            )
-            return
-    except Exception as e:
-        message.reply(f"An error occurred: {str(e)}")
-        return
-
-    # Add user to database if not already added
-    if not db.users.find_one({"user_id": user_id}):
-        db.users.insert_one({"user_id": user_id, "name": user_name, "joined_at": datetime.utcnow()})
-
-    # Welcome message and photo
-    photo_url = "https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg"  # Replace with your image URL
-    message.reply_photo(
-        photo=photo_url,
-        caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
+    # Welcome message
+    message.reply(
+        f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
         reply_markup=InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Owner Support", url=f"tg://user?id={OWNER_ID}")],
-                [InlineKeyboardButton("Movies", callback_data="movies")]
+                [InlineKeyboardButton("Movies", callback_data="movies")],
+                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
             ]
         ),
+    )
+
+    # Log the user activity when they start the bot
+    client.send_message(
+        LOGGER_GROUP,
+        f"🎥 **New User Started the Bot**:\n\n"
+        f"👤 User: [{user_name}](tg://user?id={user_id})\n"
+        f"🆔 User ID: {user_id}",
     )
 
 # Movies Inline Keyboard
 @bot.on_callback_query(filters.regex("movies"))
 def movies_menu(client, query: CallbackQuery):
     query.message.edit_text(
-        "Choose a movie:",
+        "Choose a movie to watch:",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
-                [InlineKeyboardButton("Kanguva", callback_data="kanguva")]
-            ]
-        )
-    )
-
-# Movie Quality Selector (Directly Sends Link)
-@bot.on_callback_query(filters.regex("pushpa2|kanguva"))
-def movie_quality(client, query: CallbackQuery):
-    movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
-    download_link_entry = download_links_collection.find_one({"movie_name": movie_name})
-
-    if not download_link_entry or "download_link" not in download_link_entry:
-        query.message.edit_text(f"Sorry, no download link available for {movie_name} yet.")
-        return
-
-    download_link = download_link_entry["download_link"]
-    query.message.edit_text(
-        f"Here is your download link for {movie_name}: \n{download_link}",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Back to Movies", callback_data="movies")]
+                [InlineKeyboardButton("Pushpa 1", callback_data="pushpa1")],
+                [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
+                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
             ]
         ),
     )
 
-    # Log the movie download to the logger group
+# Movie Trailer Selector (Shows Video Link and Download Link from DB)
+@bot.on_callback_query(filters.regex("pushpa1|kanguva"))
+def movie_trailer(client, query: CallbackQuery):
+    movie_name = "Pushpa 1" if query.data == "pushpa1" else "Kanguva"
+    trailer_link = ""
+    download_link = ""
+
+    # Set the trailer link based on the movie selected
+    if movie_name == "Pushpa 2":
+        trailer_link = "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FPushpa%202%20-%20The%20Rule%20Trailer%20(Hindi)%20_%20Allu%20Arjun%20_%20Sukumar%20_%20Rashmika%20Mandanna%20_%20Fahadh%20Faasil%20_%20DSP%20-%20T-Series%20(1080p%2C%20h264%2C%20youtube).mp4?alt=media&token=090765bc-fade-451a-9e6f-2c27c7c8a0d7"  # Replace with actual trailer link
+    elif movie_name == "Kanguva":
+        trailer_link = "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0"  # Replace with actual trailer link
+
+    # Fetch the download link from the database based on the movie name
+    movie_data = download_links_collection.find_one({"movie_name": movie_name})
+    if movie_data:
+        download_link = movie_data["download_link"]
+    else:
+        download_link = "No download link available for this movie."
+
+    # Send the trailer video
+    query.message.edit_text(
+        f"Here is the trailer for {movie_name}:",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("Back to Movies", callback_data="movies")],
+                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
+            ]
+        ),
+    )
+
+    # Send the trailer video
+    query.message.reply_video(
+        trailer_link,
+        caption=f"Enjoy the trailer for {movie_name}!",
+    )
+
+    # Send the download link after the trailer
+    query.message.reply_text(
+        f"🎬 **Download {movie_name}**: {download_link}",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("Back to Movies", callback_data="movies")],
+                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
+            ]
+        ),
+    )
+
+    # Update the stats when a download link is clicked
+    update_download_stats(movie_name)
+
+    # Log the trailer view and download link view to the logger group
     client.send_message(
         LOGGER_GROUP,
-        f"🎥 **Movie Downloaded**:\n\n"
+        f"🎬 **Movie Trailer & Download Link Viewed**:\n\n"
         f"👤 User: [{query.from_user.first_name}](tg://user?id={query.from_user.id})\n"
-        f"🎬 Movie: {movie_name}\n"
+        f"🎥 Movie: {movie_name}\n"
         f"🆔 User ID: {query.from_user.id}\n"
+        f"🔗 Trailer Link: {trailer_link}\n"
         f"🔗 Download Link: {download_link}",
     )
 
-# Stats Command (Owner Only)
-@bot.on_message(filters.command("stats") & filters.user(OWNER_ID))
-def stats(client, message):
-    total_users = db.users.count_documents({})
-    pushpa_downloads = db.downloads.count_documents({"movie_name": "Pushpa 2"})
-    kanguva_downloads = db.downloads.count_documents({"movie_name": "Kanguva"})
+# Update download stats in MongoDB
+def update_download_stats(movie_name):
+    # Check if stats exist for the movie
+    movie_stats = stats_collection.find_one({"movie_name": movie_name})
+    
+    if movie_stats:
+        # Increment the download count
+        stats_collection.update_one(
+            {"movie_name": movie_name},
+            {"$inc": {"download_count": 1}}
+        )
+    else:
+        # Create a new record for the movie with a download count of 1
+        stats_collection.insert_one({"movie_name": movie_name, "download_count": 1})
 
-    message.reply(f"Bot Stats:\n\n"
-                  f"Total Users: {total_users}\n"
-                  f"Pushpa 2 Downloads: {pushpa_downloads}\n"
-                  f"Kanguva Downloads: {kanguva_downloads}")
+# Command to view stats
+@bot.on_message(filters.command("stats"))
+def view_stats(client, message):
+    # Retrieve stats from MongoDB
+    pushpa_stats = stats_collection.find_one({"movie_name": "Pushpa 1"})
+    kanguva_stats = stats_collection.find_one({"movie_name": "Kanguva"})
+
+    # Prepare the stats message
+    stats_message = "🎬 **Movie Download Stats**:\n\n"
+
+    if pushpa_stats:
+        stats_message += f"📀 **Pushpa 1** Downloads: {pushpa_stats['download_count']}\n"
+    else:
+        stats_message += "📀 **Pushpa 1** Downloads: 0\n"
+
+    if kanguva_stats:
+        stats_message += f"📀 **Kanguva** Downloads: {kanguva_stats['download_count']}\n"
+    else:
+        stats_message += "📀 **Kanguva** Downloads: 0\n"
+
+    message.reply(stats_message)
+
+# Command to add movie download links (Only owner can use this)
+@bot.on_message(filters.command("addlink"))
+def add_download_link(client, message):
+    if message.from_user.id != OWNER_ID:
+        message.reply("You are not authorized to use this command.")
+        return
+    
+    try:
+        movie_name = message.text.split()[1]
+        trailer_link = message.text.split()[2]
+        download_link = message.text.split()[3]
+
+        # Store the movie links in the database
+        download_links_collection.update_one(
+            {"movie_name": movie_name},
+            {"$set": {"trailer_link": trailer_link, "download_link": download_link}},
+            upsert=True
+        )
+
+        message.reply(f"Links for {movie_name} have been successfully added!")
+    except IndexError:
+        message.reply("Usage: /addlink <movie_name> <trailer_link> <download_link>")
 
 # Run the bot
-if __name__ == "__main__":
-    bot.run()
+bot.run()
