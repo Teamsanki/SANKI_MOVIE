@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import pymongo
@@ -23,7 +24,7 @@ db = client["telegram_movie_bot"]
 download_links_collection = db["download_links"]
 stats_collection = db["stats"]
 
-# Start Command (Channel Check and Inline Channel Button)
+# Start Command
 @bot.on_message(filters.command("start"))
 def start(client, message):
     user_id = message.from_user.id
@@ -49,12 +50,9 @@ def start(client, message):
         f"🆔 User ID: {user_id}",
     )
 
-# Movies Inline Keyboard with Image
+# Movies Inline Keyboard
 @bot.on_callback_query(filters.regex("movies"))
 def movies_menu(client, query: CallbackQuery):
-    # Show movie options with trailers and download links
-    movie_poster_url = "https://graph.org/file/8e4cde401593ac8ff61cb-ce171592c3ee5635c8.jpg"  # Default movie poster URL
-
     query.message.edit_text(
         "Choose a movie to watch:",
         reply_markup=InlineKeyboardMarkup(
@@ -66,133 +64,128 @@ def movies_menu(client, query: CallbackQuery):
         ),
     )
 
-    # Send the movie poster image
-    query.message.reply_photo(
-        movie_poster_url,
-        caption="Here are the available movies. Click on any movie to view its trailer and download link."
-    )
+# Send Download Button for the Selected Movie
+@bot.on_callback_query(filters.regex("pushpa2|kanguva"))
+def movie_download(client, query: CallbackQuery):
+    movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
 
-# Movie Trailer Selector (Shows Video Link and Download Link from DB)
-@bot.on_callback_query(filters.regex("pushpa1|kanguva"))
-def movie_trailer(client, query: CallbackQuery):
-    movie_name = "Pushpa 1" if query.data == "pushpa1" else "Kanguva"
-    trailer_link = ""
-    download_link = ""
-
-    # Set the trailer link based on the movie selected
-    if movie_name == "Pushpa 2":
-        trailer_link = "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FPushpa%202%20-%20The%20Rule%20Trailer%20(Hindi)%20_%20Allu%20Arjun%20_%20Sukumar%20_%20Rashmika%20Mandanna%20_%20Fahadh%20Faasil%20_%20DSP%20-%20T-Series%20(1080p%2C%20h264%2C%20youtube).mp4?alt=media&token=090765bc-fade-451a-9e6f-2c27c7c8a0d7"  # Replace with actual trailer link
-    elif movie_name == "Kanguva":
-        trailer_link = "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0"  # Replace with actual trailer link
-
-    # Fetch the download link from the database based on the movie name
+    # Fetch the movie file link from the database
     movie_data = download_links_collection.find_one({"movie_name": movie_name})
     if movie_data:
-        download_link = movie_data["download_link"]
+        movie_file_link = movie_data["movie_file_link"]
     else:
-        download_link = "No download link available for this movie."
+        query.message.reply_text("Sorry, this movie is not available.")
+        return
 
-    # Send the trailer video
+    # Send the download button
     query.message.edit_text(
-        f"Here is the trailer for {movie_name}:",
+        f"🎬 **{movie_name}**\nClick the button below to download the movie.",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Back to Movies", callback_data="movies")],
-                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
+                [InlineKeyboardButton("Download", callback_data=f"download_{query.data}")]
             ]
         ),
     )
 
-    # Send the trailer video
-    query.message.reply_video(
-        trailer_link,
-        caption=f"Enjoy the trailer for {movie_name}!",
+# Handle the Download Button and Start Timer
+@bot.on_callback_query(filters.regex("download_pushpa2|download_kanguva"))
+async def start_download_timer(client, query: CallbackQuery):
+    movie_name = "Pushpa 2" if "pushpa2" in query.data else "Kanguva"
+
+    # Acknowledge the user's click
+    await query.answer("Download will start in 10 seconds...")
+
+    # Edit the message to show the countdown
+    for i in range(10, 0, -1):
+        await query.message.edit_text(
+            f"🎬 **{movie_name}**\nYour download will start in {i} seconds..."
+        )
+        await asyncio.sleep(1)
+
+    # Fetch the movie file link from the database
+    movie_data = download_links_collection.find_one({"movie_name": movie_name})
+    if movie_data:
+        movie_file_link = movie_data["movie_file_link"]
+    else:
+        await query.message.edit_text("Sorry, this movie is not available.")
+        return
+
+    # Send the movie file
+    await query.message.reply_video(
+        movie_file_link,
+        caption=f"🎬 **{movie_name}**\nHere is your movie. Enjoy watching!"
     )
 
-    # Send the download link after the trailer
-    query.message.reply_text(
-        f"🎬 **Download {movie_name}**: {download_link}",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Back to Movies", callback_data="movies")],
-                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
-            ]
-        ),
-    )
-
-    # Update the stats when a download link is clicked
-    update_download_stats(movie_name)
-
-    # Log the trailer view and download link view to the logger group
+    # Log the download activity
     client.send_message(
         LOGGER_GROUP,
-        f"🎬 **Movie Trailer & Download Link Viewed**:\n\n"
+        f"🎥 **Movie Downloaded**:\n\n"
         f"👤 User: [{query.from_user.first_name}](tg://user?id={query.from_user.id})\n"
-        f"🎥 Movie: {movie_name}\n"
         f"🆔 User ID: {query.from_user.id}\n"
-        f"🔗 Trailer Link: {trailer_link}\n"
-        f"🔗 Download Link: {download_link}",
+        f"📀 Movie: {movie_name}",
     )
 
-# Update download stats in MongoDB
-def update_download_stats(movie_name):
-    # Check if stats exist for the movie
-    movie_stats = stats_collection.find_one({"movie_name": movie_name})
-    
-    if movie_stats:
-        # Increment the download count
-        stats_collection.update_one(
-            {"movie_name": movie_name},
-            {"$inc": {"download_count": 1}}
-        )
-    else:
-        # Create a new record for the movie with a download count of 1
-        stats_collection.insert_one({"movie_name": movie_name, "download_count": 1})
+    # Update the stats for the movie
+    stats_collection.update_one(
+        {"movie_name": movie_name},
+        {"$inc": {"download_count": 1}},
+        upsert=True
+    )
 
-# Command to view stats
-@bot.on_message(filters.command("stats"))
-def view_stats(client, message):
-    # Retrieve stats from MongoDB
-    pushpa_stats = stats_collection.find_one({"movie_name": "Pushpa 1"})
-    kanguva_stats = stats_collection.find_one({"movie_name": "Kanguva"})
-
-    # Prepare the stats message
-    stats_message = "🎬 **Movie Download Stats**:\n\n"
-
-    if pushpa_stats:
-        stats_message += f"📀 **Pushpa 1** Downloads: {pushpa_stats['download_count']}\n"
-    else:
-        stats_message += "📀 **Pushpa 1** Downloads: 0\n"
-
-    if kanguva_stats:
-        stats_message += f"📀 **Kanguva** Downloads: {kanguva_stats['download_count']}\n"
-    else:
-        stats_message += "📀 **Kanguva** Downloads: 0\n"
-
-    message.reply(stats_message)
-
-# Command to add movie download links (Only owner can use this)
+# Add Movie Link Command
 @bot.on_message(filters.command("addlink"))
-def add_download_link(client, message):
+def add_link(client, message):
+    # Check if the user is the owner
     if message.from_user.id != OWNER_ID:
         message.reply("You are not authorized to use this command.")
         return
+
+    # Ask for the movie name and link
+    message.reply("Please send the movie name and its MP4 file link (separated by a space). Example: `Pushpa 2 http://example.com/movie.mp4`")
+
+    # Wait for the owner to send the movie name and link
+    @bot.on_message(filters.text)
+    def store_movie_link(client, message):
+        # Ensure the message is from the owner
+        if message.from_user.id != OWNER_ID:
+            return
+        
+        # Split the message into movie name and movie link
+        try:
+            movie_name, movie_file_link = message.text.split(" ", 1)
+        except ValueError:
+            message.reply("Invalid format. Please send the movie name and link separated by a space.")
+            return
+
+        # Store the movie name and file link in the database
+        download_links_collection.insert_one({
+            "movie_name": movie_name,
+            "movie_file_link": movie_file_link,
+            "added_by": OWNER_ID,
+            "date_added": datetime.now()
+        })
+
+        message.reply(f"Movie `{movie_name}` link added successfully!")
+
+# Stats Command (Movie Downloads)
+@bot.on_message(filters.command("stats"))
+def stats(client, message):
+    if message.from_user.id != OWNER_ID:
+        message.reply("You are not authorized to view the stats.")
+        return
+
+    # Fetch stats for each movie
+    stats_message = "**Movie Download Stats:**\n"
     
-    try:
-        movie_name = message.text.split()[1]
-        trailer_link = message.text.split()[2]
-        download_link = message.text.split()[3]
-
-        # Store the movie links in the database
-        download_links_collection.update_one(
-            {"movie_name": movie_name},
-            {"$set": {"trailer_link": trailer_link, "download_link": download_link}},
-            upsert=True
-        )
-
-        message.reply(f"Links for {movie_name} have been successfully added!")
-    except IndexError:
-        message.reply("Usage: /addlink <movie_name> <trailer_link> <download_link>")
+    # Get stats for all movies
+    for movie in download_links_collection.find():
+        movie_name = movie["movie_name"]
+        movie_stats = stats_collection.find_one({"movie_name": movie_name})
+        download_count = movie_stats["download_count"] if movie_stats else 0
+        stats_message += f"📀 **{movie_name}** Downloads: {download_count}\n"
+    
+    # Send the stats message
+    message.reply_text(stats_message)
 
 # Run the bot
 bot.run()
