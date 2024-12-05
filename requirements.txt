@@ -1,6 +1,4 @@
-pyrogram==2.0.106
-pytgcalls==3.0.0.dev6
-pymongo[srv]==4.5.0
-tgcrypto==1.2.3
-asyncio==3.4.3
-python-dotenv==1.0.0
+pyrogram==2.0.0
+pytgcalls==2.0.0
+pymongo==3.11.4
+python-dotenv==0.19.2
