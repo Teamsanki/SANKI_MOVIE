@@ -12,4 +12,4 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Command to run the bot
-CMD ["python", "main.py"]
+CMD ["python", "bot.py"]
