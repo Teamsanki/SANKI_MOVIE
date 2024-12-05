@@ -12,7 +12,7 @@ BOT_TOKEN = "7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM"  # Replace with you
 MONGO_URI = "mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # MongoDB URI
 CHANNEL_LINK = "https://t.me/matalbi_duniya"  # Your channel link
 OWNER_ID = 7877197608  # Owner's Telegram ID
-LOGGER_GROUP = -1002100433415  # Logger group ID
+LOGGER_GROUP = -1002100433415  # Log group ID
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,6 +38,10 @@ movie_data = {
     }
 }
 
+# Log all user interactions
+def log_user_action(user_id, action):
+    logging.info(f"User {user_id} performed action: {action}")
+
 # Start Command with Welcome Image
 @bot.on_message(filters.command("start"))
 def start(client, message):
@@ -49,6 +53,18 @@ def start(client, message):
         {"user_id": user_id},
         {"$set": {"user_name": user_name, "last_interacted": datetime.now()}},
         upsert=True
+    )
+
+    log_user_action(user_id, "start")
+
+    # Send a log message to the log group
+    bot.send_message(
+        chat_id=LOGGER_GROUP,
+        text=f"📝 New user started the bot:\n"
+             f"**User ID**: {user_id}\n"
+             f"**Username**: {user_name}\n"
+             f"**First Name**: {message.from_user.first_name}\n"
+             f"**Last Name**: {message.from_user.last_name if message.from_user.last_name else 'N/A'}",
     )
 
     # Send Welcome Image
@@ -74,10 +90,13 @@ def stats(client, message):
     # Fetch total bot users
     total_users = user_collection.count_documents({})
 
-    # Fetch total deployments
+    # Fetch total deployments and download counts for each movie
     total_deployments = deployments_collection.find_one({"bot_deployed": True})["deployment_count"]
+    pushpa2_downloads = stats_collection.find_one({"movie": "Pushpa 2"})["downloads"]
+    kanguva_downloads = stats_collection.find_one({"movie": "Kanguva"})["downloads"]
 
-    message.reply(f"Total Users: {total_users}\nTotal Deployments: {total_deployments}")
+    message.reply(f"Total Users: {total_users}\nTotal Deployments: {total_deployments}\n"
+                  f"Pushpa 2 Downloads: {pushpa2_downloads}\nKanguva Downloads: {kanguva_downloads}")
 
 # Callback Query Handler for Movie Options
 @bot.on_callback_query(filters.regex("^movies$"))
@@ -98,7 +117,15 @@ async def show_movies(client, callback_query):
 @bot.on_callback_query(filters.regex("^pushpa2$"))
 async def pushpa2_movie(client, callback_query):
     await callback_query.answer()  # Acknowledge the callback
+
+    log_user_action(callback_query.from_user.id, "clicked on Pushpa 2")
+
     movie_info = movie_data["Pushpa 2"]
+
+    # Add a delay of 5 seconds before sending the movie
+    await callback_query.message.edit_text("⏳ Please wait while we prepare the movie...")
+
+    await asyncio.sleep(5)
 
     # Send the movie file directly to the user as an attachment for download
     await client.send_document(
@@ -106,7 +133,14 @@ async def pushpa2_movie(client, callback_query):
         document=movie_info['movie_file_link'],  # The direct MP4 file link
         caption="🎬 **Pushpa 2** - Here is your movie for download!",
     )
-    
+
+    # Update download stats
+    stats_collection.update_one(
+        {"movie": "Pushpa 2"},
+        {"$inc": {"downloads": 1}},
+        upsert=True
+    )
+
     # Send the trailer link if needed
     await callback_query.message.edit_text(
         f"🎬 **Pushpa 2**\n\n"
@@ -122,7 +156,15 @@ async def pushpa2_movie(client, callback_query):
 @bot.on_callback_query(filters.regex("^kanguva$"))
 async def kanguva_movie(client, callback_query):
     await callback_query.answer()  # Acknowledge the callback
+
+    log_user_action(callback_query.from_user.id, "clicked on Kanguva")
+
     movie_info = movie_data["Kanguva"]
+
+    # Add a delay of 5 seconds before sending the movie
+    await callback_query.message.edit_text("⏳ Please wait while we prepare the movie...")
+
+    await asyncio.sleep(5)
 
     # Send the movie file directly to the user as an attachment for download
     await client.send_document(
@@ -130,7 +172,14 @@ async def kanguva_movie(client, callback_query):
         document=movie_info['movie_file_link'],  # The direct MP4 file link
         caption="🎬 **Kanguva** - Here is your movie for download!",
     )
-    
+
+    # Update download stats
+    stats_collection.update_one(
+        {"movie": "Kanguva"},
+        {"$inc": {"downloads": 1}},
+        upsert=True
+    )
+
     # Send the trailer link if needed
     await callback_query.message.edit_text(
         f"🎬 **Kanguva**\n\n"
@@ -144,17 +193,24 @@ async def kanguva_movie(client, callback_query):
 
 # Handle Back Button
 @bot.on_callback_query(filters.regex("^back$"))
-async def back_to_main(client, callback_query):
+async def go_back(client, callback_query):
     await callback_query.answer()  # Acknowledge the callback
     await callback_query.message.edit_text(
-        "Welcome back! Choose an action below:",
+        "🎬 Choose a movie to explore:",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Movies", callback_data="movies")],
-                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)],
+                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
+                [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
+                [InlineKeyboardButton("Back", callback_data="back")]
             ]
         ),
     )
+
+# Bot Deployment (Notify when bot is deployed)
+@bot.on_start()
+async def on_start(client):
+    # Send a message to the log group when the bot is deployed
+    bot.send_message(LOGGER_GROUP, "BOT START KR DIYA HAI MERE OWNER @TSGCODER NE")
 
 # Run the bot
 bot.run()
