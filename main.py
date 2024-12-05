@@ -185,7 +185,7 @@ async def stats(client, message):
 # Main async function to start the bot
 async def main():
     await bot.start()
-    await bot.idle()  # Ensure the bot keeps running and handling events
+    await bot.run()  # This replaces bot.idle()
 
 if __name__ == "__main__":
     asyncio.run(main())
