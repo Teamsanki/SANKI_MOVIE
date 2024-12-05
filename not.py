@@ -8,7 +8,14 @@ import asyncio
 from datetime import datetime
 
 # Configurations
-from config import API_ID, API_HASH, BOT_TOKEN, MONGO_URI, CHANNEL_LINK, OWNER_ID, LOGGER_GROUP
+API_ID = "27763335"  # Replace with your actual API_ID
+API_HASH = "339bc57607286baa0d68a97a692329f0"  # Replace with your actual API_HASH
+BOT_TOKEN = "7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM"  # Replace with your actual Bot Token
+MONGO_URI = "mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # Replace with your actual MongoDB URI
+CHANNEL_LINK = "https://t.me/matalbi_duniya"  # Replace with your actual channel link
+OWNER_ID = 7877197608  # Replace with the actual Owner ID
+LOGGER_GROUP = -1002100433415  # Replace with your actual log group ID
+
 logging.basicConfig(level=logging.INFO)
 
 bot = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -185,7 +192,7 @@ async def stats(client, message):
 # Main async function to start the bot
 async def main():
     await bot.start()
-    await bot.run()  # This replaces bot.idle()
+    await bot.idle()  # Ensure the bot keeps running and handling events
 
 if __name__ == "__main__":
     asyncio.run(main())
