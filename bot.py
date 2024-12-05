@@ -191,26 +191,5 @@ async def kanguva_movie(client, callback_query):
         ),
     )
 
-# Handle Back Button
-@bot.on_callback_query(filters.regex("^back$"))
-async def go_back(client, callback_query):
-    await callback_query.answer()  # Acknowledge the callback
-    await callback_query.message.edit_text(
-        "🎬 Choose a movie to explore:",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
-                [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
-                [InlineKeyboardButton("Back", callback_data="back")]
-            ]
-        ),
-    )
-
-# Bot Deployment (Notify when bot is deployed)
-@bot.on_start()
-async def on_start(client):
-    # Send a message to the log group when the bot is deployed
-    bot.send_message(LOGGER_GROUP, "BOT START KR DIYA HAI MERE OWNER @TSGCODER NE")
-
 # Run the bot
 bot.run()
