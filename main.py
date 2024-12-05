@@ -43,16 +43,13 @@ async def add_link(client, message):
 
     await message.reply(f"✅ Link added for {movie_name} ({quality}).")
 
-# Start Command
 @bot.on_message(filters.command("start"))
 async def start(client, message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
     # Channel join check
-    try:
-        await client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id)
-    except Exception:
+    if not await client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id):
         await message.reply(
             "Please join our channel to use the bot!",
             reply_markup=InlineKeyboardMarkup(
@@ -61,11 +58,15 @@ async def start(client, message):
         )
         return
 
+    # Add user to database if not already added
     if not users_collection.find_one({"user_id": user_id}):
         users_collection.insert_one({"user_id": user_id, "name": user_name, "joined_at": datetime.utcnow()})
 
-    await message.reply(
-        "Welcome to the Movie Bot!\nChoose your action:",
+    # Welcome message and photo
+    photo_url = "https://example.com/photo.jpg"  # Replace with your image URL
+    await message.reply_photo(
+        photo=photo_url,
+        caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
         reply_markup=InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Owner Support", url=f"tg://user?id={OWNER_ID}")],
