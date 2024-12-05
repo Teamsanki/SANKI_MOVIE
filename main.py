@@ -10,7 +10,7 @@ from datetime import datetime
 from config import API_ID, API_HASH, BOT_TOKEN, MONGO_URI, CHANNEL_LINK, OWNER_ID, LOGGER_GROUP
 logging.basicConfig(level=logging.INFO)
 
-bot = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 pytgcalls = PyTgCalls(bot)
 
 # MongoDB Setup
