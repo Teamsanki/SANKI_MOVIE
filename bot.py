@@ -2,11 +2,10 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioVideoPiped
 import pymongo
-import asyncio
 from datetime import datetime
 
+# Configurations
 API_ID = "27763335"  # Replace with your actual API_ID
 API_HASH = "339bc57607286baa0d68a97a692329f0"  # Replace with your actual API_HASH
 BOT_TOKEN = "7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM"  # Replace with your actual Bot Token
@@ -29,10 +28,10 @@ movies_collection = db["movies"]
 
 # Add Movie Link Command (Owner Only)
 @bot.on_message(filters.command("addlink") & filters.user(OWNER_ID))
-async def add_link(client, message):
+def add_link(client, message):
     args = message.text.split(maxsplit=3)
     if len(args) < 4:
-        await message.reply("Usage: /addlink <Movie Name> <Quality> <Link>")
+        message.reply("Usage: /addlink <Movie Name> <Quality> <Link>")
         return
 
     movie_name = args[1]
@@ -48,16 +47,16 @@ async def add_link(client, message):
     else:
         movies_collection.insert_one({"movie_name": movie_name, "links": {quality: link}})
 
-    await message.reply(f"✅ Link added for {movie_name} ({quality}).")
+    message.reply(f"✅ Link added for {movie_name} ({quality}).")
 
 @bot.on_message(filters.command("start"))
-async def start(client, message):
+def start(client, message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
     # Channel join check
-    if not await client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id):
-        await message.reply(
+    if not client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id):
+        message.reply(
             "Please join our channel to use the bot!",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]]
@@ -71,7 +70,7 @@ async def start(client, message):
 
     # Welcome message and photo
     photo_url = "https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg"  # Replace with your image URL
-    await message.reply_photo(
+    message.reply_photo(
         photo=photo_url,
         caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
         reply_markup=InlineKeyboardMarkup(
@@ -84,8 +83,8 @@ async def start(client, message):
 
 # Movies Inline Keyboard
 @bot.on_callback_query(filters.regex("movies"))
-async def movies_menu(client, query: CallbackQuery):
-    await query.message.edit_text(
+def movies_menu(client, query: CallbackQuery):
+    query.message.edit_text(
         "Choose a movie:",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -97,9 +96,9 @@ async def movies_menu(client, query: CallbackQuery):
 
 # Movie Quality Selector
 @bot.on_callback_query(filters.regex("pushpa2|kanguva"))
-async def movie_quality(client, query: CallbackQuery):
+def movie_quality(client, query: CallbackQuery):
     movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
-    await query.message.edit_text(
+    query.message.edit_text(
         f"Select quality for {movie_name}:",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -114,87 +113,80 @@ async def movie_quality(client, query: CallbackQuery):
 
 # Send Movie File via Link
 @bot.on_callback_query(filters.regex("pushpa2_1080|pushpa2_720|pushpa2_480|kanguva_1080|kanguva_720|kanguva_480"))
-async def send_movie(client, query: CallbackQuery):
+def send_movie(client, query: CallbackQuery):
     data = query.data.split("_")
     movie_name = "Pushpa 2" if "pushpa2" in data[0] else "Kanguva"
     quality = data[1]
 
     movie = movies_collection.find_one({"movie_name": movie_name})
     if not movie:
-        await query.message.reply("Movie not found!")
+        query.message.reply("Movie not found!")
         return
 
     movie_link = movie["links"].get(quality)
     if not movie_link:
-        await query.message.reply("Requested quality not available!")
+        query.message.reply("Requested quality not available!")
         return
 
     downloads_collection.insert_one({"user_id": query.from_user.id, "movie": movie_name, "quality": quality, "timestamp": datetime.utcnow()})
 
-    await query.message.reply_document(
+    query.message.reply_document(
         document=movie_link,
         caption=f"Here is your movie: {movie_name} ({quality})"
     )
 
 # Play VC Command
 @bot.on_message(filters.command("playvc"))
-async def play_vc(client, message):
+def play_vc(client, message):
     args = message.text.split(maxsplit=2)
     if len(args) < 2:
-        await message.reply("Usage: /playvc <Movie Name>")
+        message.reply("Usage: /playvc <Movie Name>")
         return
 
     movie_name = args[1]
     movie = movies_collection.find_one({"movie_name": movie_name})
     if not movie or "1080p" not in movie["links"]:
-        await message.reply("Movie or 1080p quality not found!")
+        message.reply("Movie or 1080p quality not found!")
         return
 
     movie_link = movie["links"]["1080p"]
     group_id = message.chat.id
 
-    await pytgcalls.join_group_call(
+    pytgcalls.join_group_call(
         chat_id=group_id,
         stream=AudioVideoPiped(movie_link)
     )
 
-    await client.send_message(
+    client.send_message(
         LOGGER_GROUP,
         f"🎥 **Movie Played in VC**:\n\n"
         f"👤 User: [{message.from_user.first_name}](tg://user?id={message.from_user.id})\n"
         f"🎬 Movie: {movie_name}\n"
         f"📌 Group: {message.chat.title} (ID: {group_id})",
     )
-    await message.reply(f"Playing {movie_name} in VC (1080p)...")
+    message.reply(f"Playing {movie_name} in VC (1080p)...")
 
 # Stop VC Command
 @bot.on_message(filters.command("stopvc"))
-async def stop_vc(client, message):
+def stop_vc(client, message):
     group_id = message.chat.id
-    await pytgcalls.leave_group_call(chat_id=group_id)
-    await message.reply("Stopped playing in VC.")
+    pytgcalls.leave_group_call(chat_id=group_id)
+    message.reply("Stopped playing in VC.")
 
 # Stats Command
 @bot.on_message(filters.command("stats") & filters.user(OWNER_ID))
-async def stats(client, message):
+def stats(client, message):
     total_users = users_collection.count_documents({})
     pushpa_downloads = downloads_collection.count_documents({"movie": "Pushpa 2"})
     kanguva_downloads = downloads_collection.count_documents({"movie": "Kanguva"})
 
-    await message.reply(
+    message.reply(
         f"📊 **Bot Stats**:\n\n"
         f"👤 Total Users: {total_users}\n"
         f"🎬 Pushpa 2 Downloads: {pushpa_downloads}\n"
         f"🎬 Kanguva Downloads: {kanguva_downloads}"
     )
 
-# Main async function to start the bot
-async def main():
-    try:
-        await bot.start()
-        await bot.idle()  # Ensure the bot keeps running and handling events
-    except asyncio.CancelledError:
-        await bot.stop()
-
+# Start the bot (blocking call)
 if __name__ == "__main__":
-    asyncio.run(main())
+    bot.run()  # This is a blocking call that will keep the bot running
