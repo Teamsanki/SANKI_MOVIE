@@ -33,3 +33,7 @@ This bot allows users to search for movies and download them in multiple qualiti
    ```bash
    git clone https://github.com/your-username/moviebot.git
    cd moviebot
+   pip install -r requirements.txt
+   cp sample.env
+   .env
+   python main.py
