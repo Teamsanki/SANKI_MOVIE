@@ -92,8 +92,13 @@ def stats(client, message):
 
     # Fetch total deployments and download counts for each movie
     total_deployments = deployments_collection.find_one({"bot_deployed": True})["deployment_count"]
-    pushpa2_downloads = stats_collection.find_one({"movie": "Pushpa 2"})["downloads"]
-    kanguva_downloads = stats_collection.find_one({"movie": "Kanguva"})["downloads"]
+    
+    # Fetch movie stats and handle missing data
+    pushpa2_stat = stats_collection.find_one({"movie": "Pushpa 2"})
+    kanguva_stat = stats_collection.find_one({"movie": "Kanguva"})
+
+    pushpa2_downloads = pushpa2_stat["downloads"] if pushpa2_stat else 0
+    kanguva_downloads = kanguva_stat["downloads"] if kanguva_stat else 0
 
     message.reply(f"Total Users: {total_users}\nTotal Deployments: {total_deployments}\n"
                   f"Pushpa 2 Downloads: {pushpa2_downloads}\nKanguva Downloads: {kanguva_downloads}")
@@ -127,12 +132,19 @@ async def pushpa2_movie(client, callback_query):
 
     await asyncio.sleep(5)
 
-    # Send the movie file directly to the user as an attachment for download
-    await client.send_document(
-        chat_id=callback_query.from_user.id,
-        document=movie_info['movie_file_link'],  # The direct MP4 file link
-        caption="🎬 **Pushpa 2** - Here is your movie for download!",
-    )
+    # Check if the movie file URL is valid (it should be publicly accessible)
+    if movie_info['movie_file_link'].startswith("https://"):
+        # Send the movie file directly to the user as an attachment for download
+        try:
+            await client.send_document(
+                chat_id=callback_query.from_user.id,
+                document=movie_info['movie_file_link'],  # The direct MP4 file link
+                caption="🎬 **Pushpa 2** - Here is your movie for download!",
+            )
+        except Exception as e:
+            await callback_query.message.edit_text(f"❌ Failed to send movie. Error: {str(e)}")
+    else:
+        await callback_query.message.edit_text("❌ Invalid movie file link. Please try again later.")
 
     # Update download stats
     stats_collection.update_one(
