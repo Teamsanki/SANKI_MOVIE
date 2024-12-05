@@ -64,21 +64,6 @@ def start(client, message):
         ),
     )
 
-    # Increment total deployments
-    deployments_collection.update_one(
-        {"bot_deployed": True},
-        {"$inc": {"deployment_count": 1}},
-        upsert=True
-    )
-
-    # Log the user activity
-    client.send_message(
-        LOGGER_GROUP,
-        f"📥 **New User Started the Bot**\n\n"
-        f"👤 User: [{user_name}](tg://user?id={user_id})\n"
-        f"🆔 User ID: {user_id}",
-    )
-
 # Stats Command
 @bot.on_message(filters.command("stats"))
 def stats(client, message):
@@ -89,128 +74,87 @@ def stats(client, message):
     # Fetch total bot users
     total_users = user_collection.count_documents({})
 
-    # Fetch movie download stats
-    pushpa2_downloads = stats_collection.find_one({"movie_name": "Pushpa 2"})
-    kanguva_downloads = stats_collection.find_one({"movie_name": "Kanguva"})
-    pushpa2_count = pushpa2_downloads["download_count"] if pushpa2_downloads else 0
-    kanguva_count = kanguva_downloads["download_count"] if kanguva_downloads else 0
-
     # Fetch total deployments
-    deployments = deployments_collection.find_one({"bot_deployed": True})
-    deployment_count = deployments["deployment_count"] if deployments else 0
+    total_deployments = deployments_collection.find_one({"bot_deployed": True})["deployment_count"]
 
-    # Stats Message
-    stats_message = f"**Bot Stats:**\n\n"
-    stats_message += f"👥 **Total Users:** {total_users}\n"
-    stats_message += f"🎬 **Pushpa 2 Downloads:** {pushpa2_count}\n"
-    stats_message += f"🎬 **Kanguva Downloads:** {kanguva_count}\n"
-    stats_message += f"🤖 **Total Bot Deployments:** {deployment_count}"
+    message.reply(f"Total Users: {total_users}\nTotal Deployments: {total_deployments}")
 
-    message.reply_text(stats_message)
-
-# Movie Details with Trailer Link
-@bot.on_callback_query(filters.regex("pushpa2|kanguva"))
-def movie_details(client, query: CallbackQuery):
-    movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
-
-    # Fetch movie details from the movie_data dictionary
-    movie_details = movie_data.get(movie_name)
-    if not movie_details:
-        query.message.reply_text("Sorry, this movie is not available.")
-        return
-
-    movie_file_link = movie_details["movie_file_link"]
-    trailer_link = movie_details["trailer_link"]
-
-    # Send movie details with a download button and trailer link
-    query.message.edit_text(
-        f"🎬 **{movie_name}**\n\n"
-        f"📹 [Watch Trailer]({trailer_link})\n\n"
-        f"Click the button below to download the movie.",
-        disable_web_page_preview=True,
+# Callback Query Handler for Movie Options
+@bot.on_callback_query(filters.regex("^movies$"))
+async def show_movies(client, callback_query):
+    await callback_query.answer()  # Acknowledge the callback
+    await callback_query.message.edit_text(
+        "🎬 Choose a movie to explore:",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Download", callback_data=f"download_{query.data}")],
+                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
+                [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
+                [InlineKeyboardButton("Back", callback_data="back")]
             ]
         ),
     )
 
-# Download Timer and Movie File Delivery
-@bot.on_callback_query(filters.regex("download_pushpa2|download_kanguva"))
-async def start_download_timer(client, query: CallbackQuery):
-    movie_name = "Pushpa 2" if "pushpa2" in query.data else "Kanguva"
+# Handle Pushpa 2 Movie Button
+@bot.on_callback_query(filters.regex("^pushpa2$"))
+async def pushpa2_movie(client, callback_query):
+    await callback_query.answer()  # Acknowledge the callback
+    movie_info = movie_data["Pushpa 2"]
 
-    # Acknowledge the user's click
-    await query.answer("Preparing your download...")
-
-    # Countdown timer
-    for i in range(10, 0, -1):
-        await query.message.edit_text(
-            f"🎬 **{movie_name}**\nYour download will start in {i} seconds..."
-        )
-        await asyncio.sleep(1)
-
-    # Fetch the movie file link from the movie_data dictionary
-    movie_details = movie_data.get(movie_name)
-    if not movie_details:
-        await query.message.edit_text("Sorry, this movie is not available.")
-        return
-
-    movie_file_link = movie_details["movie_file_link"]
-
-    # Send the movie file (simulated by sending a link for now)
-    await query.message.reply_text(
-        f"🎬 **{movie_name}**\nHere is your movie download link:\n{movie_file_link}"
+    # Send the movie file directly to the user as an attachment for download
+    await client.send_document(
+        chat_id=callback_query.from_user.id,
+        document=movie_info['movie_file_link'],  # The direct MP4 file link
+        caption="🎬 **Pushpa 2** - Here is your movie for download!",
+    )
+    
+    # Send the trailer link if needed
+    await callback_query.message.edit_text(
+        f"🎬 **Pushpa 2**\n\n"
+        f"Trailer: [Watch Trailer](<{movie_info['trailer_link']}>)",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("Back", callback_data="movies")]
+            ]
+        ),
     )
 
-    # Log the download
-    client.send_message(
-        LOGGER_GROUP,
-        f"📥 **Movie Downloaded**\n\n"
-        f"👤 User: [{query.from_user.first_name}](tg://user?id={query.from_user.id})\n"
-        f"🆔 User ID: {query.from_user.id}\n"
-        f"🎬 Movie: {movie_name}",
+# Handle Kanguva Movie Button
+@bot.on_callback_query(filters.regex("^kanguva$"))
+async def kanguva_movie(client, callback_query):
+    await callback_query.answer()  # Acknowledge the callback
+    movie_info = movie_data["Kanguva"]
+
+    # Send the movie file directly to the user as an attachment for download
+    await client.send_document(
+        chat_id=callback_query.from_user.id,
+        document=movie_info['movie_file_link'],  # The direct MP4 file link
+        caption="🎬 **Kanguva** - Here is your movie for download!",
+    )
+    
+    # Send the trailer link if needed
+    await callback_query.message.edit_text(
+        f"🎬 **Kanguva**\n\n"
+        f"Trailer: [Watch Trailer](<{movie_info['trailer_link']}>)",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("Back", callback_data="movies")]
+            ]
+        ),
     )
 
-    # Update movie download stats
-    stats_collection.update_one(
-        {"movie_name": movie_name},
-        {"$inc": {"download_count": 1}},
-        upsert=True
+# Handle Back Button
+@bot.on_callback_query(filters.regex("^back$"))
+async def back_to_main(client, callback_query):
+    await callback_query.answer()  # Acknowledge the callback
+    await callback_query.message.edit_text(
+        "Welcome back! Choose an action below:",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("Movies", callback_data="movies")],
+                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)],
+            ]
+        ),
     )
-
-# Add Movie Command (For Owner)
-@bot.on_message(filters.command("addlink"))
-def add_movie(client, message):
-    if message.from_user.id != OWNER_ID:
-        message.reply("You are not authorized to use this command.")
-        return
-
-    message.reply("Send the movie name, MP4 file link, and trailer link in this format:\n"
-                  "`Pushpa 2 <movie_file_link> <trailer_link>`")
-
-    @bot.on_message(filters.text)
-    def save_movie_details(client, message):
-        if message.from_user.id != OWNER_ID:
-            return
-
-        try:
-            parts = message.text.split(" ", 2)
-            movie_name = parts[0]
-            movie_file_link = parts[1]
-            trailer_link = parts[2]
-        except IndexError:
-            message.reply("Invalid format. Please provide all details.")
-            return
-
-        movies_collection.insert_one({
-            "movie_name": movie_name,
-            "movie_file_link": movie_file_link,
-            "trailer_link": trailer_link,
-            "added_by": OWNER_ID,
-            "date_added": datetime.now(),
-        })
-        message.reply(f"Movie **{movie_name}** has been added successfully!")
 
 # Run the bot
 bot.run()
