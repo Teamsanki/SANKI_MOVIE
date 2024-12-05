@@ -49,19 +49,28 @@ def add_link(client, message):
 
     message.reply(f"✅ Link added for {movie_name} ({quality}).")
 
+# Handle Start Command and Check Channel Membership
 @bot.on_message(filters.command("start"))
 def start(client, message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
-    # Channel join check
-    if not client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id):
-        message.reply(
-            "Please join our channel to use the bot!",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]]
-            ),
-        )
+    # Check if user has joined the channel
+    try:
+        member = client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id)
+        if member.status not in ["member", "administrator", "creator"]:
+            message.reply(
+                "Please join our channel to use the bot!",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]]
+                ),
+            )
+            return
+    except Exception as e:
+        if "CHAT_ADMIN_REQUIRED" in str(e):
+            message.reply("I don't have admin rights in the channel. Please make me an admin to check your membership.")
+        else:
+            message.reply(f"An error occurred: {str(e)}")
         return
 
     # Add user to database if not already added
@@ -79,6 +88,14 @@ def start(client, message):
                 [InlineKeyboardButton("Movies", callback_data="movies")]
             ]
         ),
+    )
+
+    # Log the start action
+    bot.send_message(
+        LOGGER_GROUP,
+        f"📥 **New User Started the Bot**:\n\n"
+        f"👤 User: [{user_name}](tg://user?id={user_id})\n"
+        f"📅 Date: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
 # Movies Inline Keyboard
@@ -135,36 +152,40 @@ def send_movie(client, query: CallbackQuery):
         caption=f"Here is your movie: {movie_name} ({quality})"
     )
 
-# Play VC Command
-@bot.on_message(filters.command("playvc"))
+# Play VC Command - Owner Uploads Link
+@bot.on_message(filters.command("playvc") & filters.user(OWNER_ID))
 def play_vc(client, message):
     args = message.text.split(maxsplit=2)
-    if len(args) < 2:
-        message.reply("Usage: /playvc <Movie Name>")
+    if len(args) < 3:
+        message.reply("Usage: /playvc <Movie Name> <Quality>")
         return
 
     movie_name = args[1]
+    quality = args[2]
+
     movie = movies_collection.find_one({"movie_name": movie_name})
-    if not movie or "1080p" not in movie["links"]:
-        message.reply("Movie or 1080p quality not found!")
+    if not movie or quality not in movie["links"]:
+        message.reply("Movie or specified quality not found!")
         return
 
-    movie_link = movie["links"]["1080p"]
+    movie_link = movie["links"][quality]
     group_id = message.chat.id
 
+    # Play the movie in the VC (Voice chat)
     pytgcalls.join_group_call(
         chat_id=group_id,
         stream=AudioVideoPiped(movie_link)
     )
 
-    client.send_message(
+    # Log the action in logger group
+    bot.send_message(
         LOGGER_GROUP,
         f"🎥 **Movie Played in VC**:\n\n"
         f"👤 User: [{message.from_user.first_name}](tg://user?id={message.from_user.id})\n"
         f"🎬 Movie: {movie_name}\n"
         f"📌 Group: {message.chat.title} (ID: {group_id})",
     )
-    message.reply(f"Playing {movie_name} in VC (1080p)...")
+    message.reply(f"Playing {movie_name} ({quality}) in VC...")
 
 # Stop VC Command
 @bot.on_message(filters.command("stopvc"))
@@ -181,12 +202,10 @@ def stats(client, message):
     kanguva_downloads = downloads_collection.count_documents({"movie": "Kanguva"})
 
     message.reply(
-        f"📊 **Bot Stats**:\n\n"
-        f"👤 Total Users: {total_users}\n"
-        f"🎬 Pushpa 2 Downloads: {pushpa_downloads}\n"
-        f"🎬 Kanguva Downloads: {kanguva_downloads}"
+        f"Total Users: {total_users}\n"
+        f"Pushpa 2 Downloads: {pushpa_downloads}\n"
+        f"Kanguva Downloads: {kanguva_downloads}"
     )
 
-# Start the bot (blocking call)
-if __name__ == "__main__":
-    bot.run()  # This is a blocking call that will keep the bot running
+# Start the bot
+bot.run()
