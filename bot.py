@@ -7,7 +7,6 @@ import pymongo
 import asyncio
 from datetime import datetime
 
-# Configurations
 API_ID = "27763335"  # Replace with your actual API_ID
 API_HASH = "339bc57607286baa0d68a97a692329f0"  # Replace with your actual API_HASH
 BOT_TOKEN = "7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM"  # Replace with your actual Bot Token
@@ -191,8 +190,11 @@ async def stats(client, message):
 
 # Main async function to start the bot
 async def main():
-    await bot.start()
-    await bot.idle()  # Ensure the bot keeps running and handling events
+    try:
+        await bot.start()
+        await bot.idle()  # Ensure the bot keeps running and handling events
+    except asyncio.CancelledError:
+        await bot.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
