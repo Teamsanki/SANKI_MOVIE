@@ -68,20 +68,7 @@ def movies_menu(client, query: CallbackQuery):
             ]
         ),
     )
-
-# Handle Unknown Commands
-@bot.on_message(filters.command() & ~filters.command(["start", "movies", "addlink", "stats"]))
-def unknown_command(client, message):
-    message.reply_animation(
-        "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2Fmister-bean-misterbean.mp4?alt=media&token=0bd4bb48-a475-4845-a036-f408bfbb16af",  # Replace with your actual GIF URL
-        caption="Bhai kyu pange le rha, movie download kro or enjoy kro! 🎥",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Movies Menu", callback_data="movies")],
-                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)],
-            ]
-        ),
-    )
+    
 # Movie Details with Trailer Link
 @bot.on_callback_query(filters.regex("pushpa2|kanguva"))
 def movie_details(client, query: CallbackQuery):
