@@ -13,6 +13,7 @@ MONGO_URI = "mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retry
 CHANNEL_LINK = "https://t.me/matalbi_duniya"  # Replace with your actual channel link
 OWNER_ID = 7877197608  # Replace with the actual Owner ID
 LOGGER_GROUP = -1002100433415  # Replace with your actual log group ID
+ASSISTANT_ID = 7912035011  # Replace with your assistant ID (ID of the bot used for streaming)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -86,7 +87,8 @@ def play_vc(client, message):
     # Play movie in VC
     pytgcalls.join_group_call(
         chat_id=group_id,
-        stream=AudioVideoPiped(movie_link)
+        stream=AudioVideoPiped(movie_link),
+        bot_id=ASSISTANT_ID  # Use assistant ID for the VC stream
     )
 
     # Log the play action to the logger group
@@ -161,11 +163,6 @@ def movie_quality(client, query: CallbackQuery):
         return
 
     download_link = download_link_entry["download_link"]
-    user_id = query.from_user.id
-    username = query.from_user.username
-    user_first_name = query.from_user.first_name
-
-    # Send the movie download link to the user
     query.message.edit_text(
         f"Here is your download link for {movie_name}: \n{download_link}",
         reply_markup=InlineKeyboardMarkup(
@@ -175,14 +172,14 @@ def movie_quality(client, query: CallbackQuery):
         ),
     )
 
-    # Log the download action to the logger group
+    # Log the movie download to the logger group
     client.send_message(
         LOGGER_GROUP,
-        f"🎬 **Movie Downloaded**:\n\n"
-        f"👤 User: [{user_first_name}](tg://user?id={user_id})\n"
-        f"🆔 User ID: {user_id}\n"
+        f"🎥 **Movie Downloaded**:\n\n"
+        f"👤 User: [{query.from_user.first_name}](tg://user?id={query.from_user.id})\n"
         f"🎬 Movie: {movie_name}\n"
-        f"📥 Download Link: {download_link}",
+        f"🆔 User ID: {query.from_user.id}\n"
+        f"🔗 Download Link: {download_link}",
     )
 
 # Stats Command (Owner Only)
