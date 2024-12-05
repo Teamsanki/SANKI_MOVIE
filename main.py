@@ -2,7 +2,7 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioVideoPiped
+from pytgcalls.types.stream import AudioVideoPiped
 import pymongo
 from datetime import datetime
 
