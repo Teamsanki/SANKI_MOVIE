@@ -49,18 +49,27 @@ def start(client, message):
         f"🆔 User ID: {user_id}",
     )
 
-# Movies Inline Keyboard
+# Movies Inline Keyboard with Image
 @bot.on_callback_query(filters.regex("movies"))
 def movies_menu(client, query: CallbackQuery):
+    # Show movie options with trailers and download links
+    movie_poster_url = "https://graph.org/file/8e4cde401593ac8ff61cb-ce171592c3ee5635c8.jpg"  # Default movie poster URL
+
     query.message.edit_text(
         "Choose a movie to watch:",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Pushpa 1", callback_data="pushpa1")],
+                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
                 [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
                 [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]  # Channel button for all users
             ]
         ),
+    )
+
+    # Send the movie poster image
+    query.message.reply_photo(
+        movie_poster_url,
+        caption="Here are the available movies. Click on any movie to view its trailer and download link."
     )
 
 # Movie Trailer Selector (Shows Video Link and Download Link from DB)
