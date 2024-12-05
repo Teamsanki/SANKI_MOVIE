@@ -5,10 +5,10 @@ import os
 load_dotenv(dotenv_path="sample.env")
 
 # Access environment variables
-API_ID = os.getenv("API_ID")
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URI = os.getenv("MONGO_URI")
-CHANNEL_LINK = os.getenv("CHANNEL_LINK")
-OWNER_ID = os.getenv("OWNER_ID")
-LOGGER_GROUP = os.getenv("LOGGER_GROUP")
+API_ID = os.getenv("27763335")
+API_HASH = os.getenv("339bc57607286baa0d68a97a692329f0")
+BOT_TOKEN = os.getenv("7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM")
+MONGO_URI = os.getenv("mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+CHANNEL_LINK = os.getenv("https://t.me/matalbi_duniya")
+OWNER_ID = os.getenv("7877197608")
+LOGGER_GROUP = os.getenv("-1002100433415")
