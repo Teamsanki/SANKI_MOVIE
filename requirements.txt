@@ -1,4 +1,4 @@
-pyrogram==2.0.0
-pytgcalls==2.0.0
+pyrogram==2.0.106
+py-tgcalls==0.9.7
 pymongo==3.11.4
-python-dotenv==0.19.2
+python-dotenv
