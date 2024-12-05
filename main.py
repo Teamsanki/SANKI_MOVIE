@@ -2,7 +2,7 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+from pytgcalls.types import AudioVideoPiped
 import pymongo
 import asyncio
 from datetime import datetime
@@ -64,7 +64,7 @@ async def start(client, message):
         users_collection.insert_one({"user_id": user_id, "name": user_name, "joined_at": datetime.utcnow()})
 
     # Welcome message and photo
-    photo_url = "https://example.com/photo.jpg"  # Replace with your image URL
+    photo_url = "https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg"  # Replace with your image URL
     await message.reply_photo(
         photo=photo_url,
         caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
@@ -185,6 +185,7 @@ async def stats(client, message):
 # Main async function to start the bot
 async def main():
     await bot.start()
+    await bot.idle()  # Ensure the bot keeps running and handling events
 
 if __name__ == "__main__":
     asyncio.run(main())
