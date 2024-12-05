@@ -1,7 +1,7 @@
 import logging
 import asyncio
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
 import pymongo
 from datetime import datetime
 
@@ -24,8 +24,17 @@ db = client["telegram_movie_bot"]
 movies_collection = db["movies"]
 stats_collection = db["stats"]
 
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+# Movie Data (Add movie file link and trailer link for both movies)
+movie_data = {
+    "Pushpa 2": {
+        "movie_file_link": "https://example.com/pushpa2.mp4",  # Replace with the actual movie file link
+        "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FPushpa%202%20-%20The%20Rule%20Trailer%20(Hindi)%20_%20Allu%20Arjun%20_%20Sukumar%20_%20Rashmika%20Mandanna%20_%20Fahadh%20Faasil%20_%20DSP%20-%20T-Series%20(1080p%2C%20h264%2C%20youtube).mp4?alt=media&token=090765bc-fade-451a-9e6f-2c27c7c8a0d7"  # Replace with the actual trailer link
+    },
+    "Kanguva": {
+        "movie_file_link": "https://pixeldra.in/api/file/prD8PBCb?download",  # Replace with the actual movie file link
+        "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0"  # Replace with the actual trailer link
+    }
+}
 
 # Start Command with Welcome Image
 @bot.on_message(filters.command("start"))
@@ -71,21 +80,20 @@ def movies_menu(client, query: CallbackQuery):
             ]
         ),
     )
-    
+
 # Movie Details with Trailer Link
 @bot.on_callback_query(filters.regex("pushpa2|kanguva"))
 def movie_details(client, query: CallbackQuery):
     movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
 
-    # Fetch movie details from the database
-    movie_data = movies_collection.find_one({"movie_name": movie_name})
-    if not movie_data:
+    # Fetch movie details from the movie_data dictionary
+    movie_details = movie_data.get(movie_name)
+    if not movie_details:
         query.message.reply_text("Sorry, this movie is not available.")
         return
 
-    # Prepare movie details
-    movie_file_link = movie_data["movie_file_link"]
-    trailer_link = movie_data.get("trailer_link", "Trailer not available")
+    movie_file_link = movie_details["movie_file_link"]
+    trailer_link = movie_details["trailer_link"]
 
     # Send movie details with a download button
     query.message.edit_text(
@@ -115,15 +123,15 @@ async def start_download_timer(client, query: CallbackQuery):
         )
         await asyncio.sleep(1)
 
-    # Fetch the movie file link from the database
-    movie_data = movies_collection.find_one({"movie_name": movie_name})
-    if not movie_data:
+    # Fetch the movie file link from the movie_data dictionary
+    movie_details = movie_data.get(movie_name)
+    if not movie_details:
         await query.message.edit_text("Sorry, this movie is not available.")
         return
 
-    movie_file_link = movie_data["movie_file_link"]
+    movie_file_link = movie_details["movie_file_link"]
 
-    # Send the movie file
+    # Send the movie file (simulated by sending a link for now)
     await query.message.reply_video(
         movie_file_link,
         caption=f"🎬 **{movie_name}**\nHere is your movie. Enjoy watching!"
