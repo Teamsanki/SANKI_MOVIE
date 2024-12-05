@@ -4,13 +4,14 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 from pytgcalls import PyTgCalls
 from pytgcalls.types import AudioPiped
 import pymongo
+import asyncio
 from datetime import datetime
 
 # Configurations
 from config import API_ID, API_HASH, BOT_TOKEN, MONGO_URI, CHANNEL_LINK, OWNER_ID, LOGGER_GROUP
 logging.basicConfig(level=logging.INFO)
 
-bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+bot = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 pytgcalls = PyTgCalls(bot)
 
 # MongoDB Setup
@@ -181,6 +182,9 @@ async def stats(client, message):
         f"🎬 Kanguva Downloads: {kanguva_downloads}"
     )
 
-# Start PyTgCalls
-pytgcalls.start()
-bot.run()
+# Main async function to start the bot
+async def main():
+    await bot.start()
+
+if __name__ == "__main__":
+    asyncio.run(main())
