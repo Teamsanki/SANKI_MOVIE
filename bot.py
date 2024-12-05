@@ -108,6 +108,20 @@ def start(client, message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
+    # Skip channel check for the owner
+    if user_id == OWNER_ID:
+        message.reply_photo(
+            photo="https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg",  # Replace with your image URL
+            caption=f"Welcome to the Movie Bot, {user_name}!\nChoose your action:",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("Owner Support", url=f"tg://user?id={OWNER_ID}")],
+                    [InlineKeyboardButton("Movies", callback_data="movies")]
+                ]
+            ),
+        )
+        return
+
     # Check if user has joined the channel
     try:
         member = client.get_chat_member(CHANNEL_LINK.split('/')[-1], user_id)
@@ -187,16 +201,14 @@ def movie_quality(client, query: CallbackQuery):
 @bot.on_message(filters.command("stats") & filters.user(OWNER_ID))
 def stats(client, message):
     total_users = db.users.count_documents({})
-    pushpa_downloads = db.downloads.count_documents({"movie": "Pushpa 2"})
-    kanguva_downloads = db.downloads.count_documents({"movie": "Kanguva"})
+    pushpa_downloads = db.downloads.count_documents({"movie_name": "Pushpa 2"})
+    kanguva_downloads = db.downloads.count_documents({"movie_name": "Kanguva"})
 
-    message.reply(
-        f"📊 **Bot Stats**:\n\n"
-        f"👤 Total Users: {total_users}\n"
-        f"🎬 Pushpa 2 Downloads: {pushpa_downloads}\n"
-        f"🎬 Kanguva Downloads: {kanguva_downloads}"
-    )
+    message.reply(f"Bot Stats:\n\n"
+                  f"Total Users: {total_users}\n"
+                  f"Pushpa 2 Downloads: {pushpa_downloads}\n"
+                  f"Kanguva Downloads: {kanguva_downloads}")
 
-# Start the bot (blocking call)
+# Run the bot
 if __name__ == "__main__":
-    bot.run()  # This is a blocking call that will keep the bot running
+    bot.run()
