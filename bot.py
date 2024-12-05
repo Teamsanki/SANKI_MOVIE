@@ -1,7 +1,7 @@
 import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from pytgcalls import PyTgCalls
+from pytgcalls import PyTgCalls, AudioVideoPiped
 import pymongo
 from datetime import datetime
 
@@ -22,34 +22,84 @@ pytgcalls = PyTgCalls(bot)
 # MongoDB Setup
 client = pymongo.MongoClient(MONGO_URI)
 db = client["telegram_movie_bot"]
-users_collection = db["users"]
-downloads_collection = db["downloads"]
 movies_collection = db["movies"]
+download_links_collection = db["download_links"]
 
-# Add Movie Link Command (Owner Only)
-@bot.on_message(filters.command("addlink") & filters.user(OWNER_ID))
-def add_link(client, message):
-    args = message.text.split(maxsplit=3)
-    if len(args) < 4:
-        message.reply("Usage: /addlink <Movie Name> <Quality> <Link>")
+# Add Movie VC Link Command (Owner Only)
+@bot.on_message(filters.command("addvc") & filters.user(OWNER_ID))
+def add_vc_link(client, message):
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        message.reply("Usage: /addvc <Movie Name> <Link>")
         return
 
     movie_name = args[1]
-    quality = args[2]
-    link = args[3]
+    link = args[2]
 
+    # Insert or update movie VC link in database
+    movies_collection.update_one(
+        {"movie_name": movie_name},
+        {"$set": {"vc_link": link}},
+        upsert=True
+    )
+
+    message.reply(f"✅ VC Link added for {movie_name}.")
+
+# Add Movie Download Link Command (Owner Only)
+@bot.on_message(filters.command("addlink") & filters.user(OWNER_ID))
+def add_download_link(client, message):
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        message.reply("Usage: /addlink <Movie Name> <Download Link>")
+        return
+
+    movie_name = args[1]
+    download_link = args[2]
+
+    # Insert or update download link in the database
+    download_links_collection.update_one(
+        {"movie_name": movie_name},
+        {"$set": {"download_link": download_link}},
+        upsert=True
+    )
+
+    message.reply(f"✅ Download link added for {movie_name}.")
+
+# Play VC Command (Play Movie in Voice Chat)
+@bot.on_message(filters.command("playvc"))
+def play_vc(client, message):
+    args = message.text.split(maxsplit=2)
+    if len(args) < 2:
+        message.reply("Usage: /playvc <Movie Name>")
+        return
+
+    movie_name = args[1]
     movie = movies_collection.find_one({"movie_name": movie_name})
-    if movie:
-        movies_collection.update_one(
-            {"movie_name": movie_name},
-            {"$set": {f"links.{quality}": link}}
-        )
-    else:
-        movies_collection.insert_one({"movie_name": movie_name, "links": {quality: link}})
 
-    message.reply(f"✅ Link added for {movie_name} ({quality}).")
+    if not movie or "vc_link" not in movie:
+        message.reply(f"Movie '{movie_name}' not found or no VC link available.")
+        return
 
-# Handle Start Command and Check Channel Membership
+    movie_link = movie["vc_link"]
+    group_id = message.chat.id
+
+    # Play movie in VC
+    pytgcalls.join_group_call(
+        chat_id=group_id,
+        stream=AudioVideoPiped(movie_link)
+    )
+
+    # Log the play action to the logger group
+    client.send_message(
+        LOGGER_GROUP,
+        f"🎥 **Movie Played in VC**:\n\n"
+        f"👤 User: [{message.from_user.first_name}](tg://user?id={message.from_user.id})\n"
+        f"🎬 Movie: {movie_name}\n"
+        f"📌 Group: {message.chat.title} (ID: {group_id})",
+    )
+    message.reply(f"Playing {movie_name} in VC...")
+
+# Start Command (Channel Check)
 @bot.on_message(filters.command("start"))
 def start(client, message):
     user_id = message.from_user.id
@@ -67,15 +117,12 @@ def start(client, message):
             )
             return
     except Exception as e:
-        if "CHAT_ADMIN_REQUIRED" in str(e):
-            message.reply("I don't have admin rights in the channel. Please make me an admin to check your membership.")
-        else:
-            message.reply(f"An error occurred: {str(e)}")
+        message.reply(f"An error occurred: {str(e)}")
         return
 
     # Add user to database if not already added
-    if not users_collection.find_one({"user_id": user_id}):
-        users_collection.insert_one({"user_id": user_id, "name": user_name, "joined_at": datetime.utcnow()})
+    if not db.users.find_one({"user_id": user_id}):
+        db.users.insert_one({"user_id": user_id, "name": user_name, "joined_at": datetime.utcnow()})
 
     # Welcome message and photo
     photo_url = "https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg"  # Replace with your image URL
@@ -88,14 +135,6 @@ def start(client, message):
                 [InlineKeyboardButton("Movies", callback_data="movies")]
             ]
         ),
-    )
-
-    # Log the start action
-    bot.send_message(
-        LOGGER_GROUP,
-        f"📥 **New User Started the Bot**:\n\n"
-        f"👤 User: [{user_name}](tg://user?id={user_id})\n"
-        f"📅 Date: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
 # Movies Inline Keyboard
@@ -111,101 +150,55 @@ def movies_menu(client, query: CallbackQuery):
         )
     )
 
-# Movie Quality Selector
+# Movie Quality Selector (Directly Sends Link)
 @bot.on_callback_query(filters.regex("pushpa2|kanguva"))
 def movie_quality(client, query: CallbackQuery):
     movie_name = "Pushpa 2" if query.data == "pushpa2" else "Kanguva"
+    download_link_entry = download_links_collection.find_one({"movie_name": movie_name})
+
+    if not download_link_entry or "download_link" not in download_link_entry:
+        query.message.edit_text(f"Sorry, no download link available for {movie_name} yet.")
+        return
+
+    download_link = download_link_entry["download_link"]
+    user_id = query.from_user.id
+    username = query.from_user.username
+    user_first_name = query.from_user.first_name
+
+    # Send the movie download link to the user
     query.message.edit_text(
-        f"Select quality for {movie_name}:",
+        f"Here is your download link for {movie_name}: \n{download_link}",
         reply_markup=InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("1080p", callback_data=f"{query.data}_1080"),
-                    InlineKeyboardButton("720p", callback_data=f"{query.data}_720"),
-                    InlineKeyboardButton("480p", callback_data=f"{query.data}_480"),
-                ]
+                [InlineKeyboardButton("Back to Movies", callback_data="movies")]
             ]
         ),
     )
 
-# Send Movie File via Link
-@bot.on_callback_query(filters.regex("pushpa2_1080|pushpa2_720|pushpa2_480|kanguva_1080|kanguva_720|kanguva_480"))
-def send_movie(client, query: CallbackQuery):
-    data = query.data.split("_")
-    movie_name = "Pushpa 2" if "pushpa2" in data[0] else "Kanguva"
-    quality = data[1]
-
-    movie = movies_collection.find_one({"movie_name": movie_name})
-    if not movie:
-        query.message.reply("Movie not found!")
-        return
-
-    movie_link = movie["links"].get(quality)
-    if not movie_link:
-        query.message.reply("Requested quality not available!")
-        return
-
-    downloads_collection.insert_one({"user_id": query.from_user.id, "movie": movie_name, "quality": quality, "timestamp": datetime.utcnow()})
-
-    query.message.reply_document(
-        document=movie_link,
-        caption=f"Here is your movie: {movie_name} ({quality})"
-    )
-
-# Play VC Command - Owner Uploads Link
-@bot.on_message(filters.command("playvc") & filters.user(OWNER_ID))
-def play_vc(client, message):
-    args = message.text.split(maxsplit=2)
-    if len(args) < 3:
-        message.reply("Usage: /playvc <Movie Name> <Quality>")
-        return
-
-    movie_name = args[1]
-    quality = args[2]
-
-    movie = movies_collection.find_one({"movie_name": movie_name})
-    if not movie or quality not in movie["links"]:
-        message.reply("Movie or specified quality not found!")
-        return
-
-    movie_link = movie["links"][quality]
-    group_id = message.chat.id
-
-    # Play the movie in the VC (Voice chat)
-    pytgcalls.join_group_call(
-        chat_id=group_id,
-        stream=AudioVideoPiped(movie_link)
-    )
-
-    # Log the action in logger group
-    bot.send_message(
+    # Log the download action to the logger group
+    client.send_message(
         LOGGER_GROUP,
-        f"🎥 **Movie Played in VC**:\n\n"
-        f"👤 User: [{message.from_user.first_name}](tg://user?id={message.from_user.id})\n"
+        f"🎬 **Movie Downloaded**:\n\n"
+        f"👤 User: [{user_first_name}](tg://user?id={user_id})\n"
+        f"🆔 User ID: {user_id}\n"
         f"🎬 Movie: {movie_name}\n"
-        f"📌 Group: {message.chat.title} (ID: {group_id})",
+        f"📥 Download Link: {download_link}",
     )
-    message.reply(f"Playing {movie_name} ({quality}) in VC...")
 
-# Stop VC Command
-@bot.on_message(filters.command("stopvc"))
-def stop_vc(client, message):
-    group_id = message.chat.id
-    pytgcalls.leave_group_call(chat_id=group_id)
-    message.reply("Stopped playing in VC.")
-
-# Stats Command
+# Stats Command (Owner Only)
 @bot.on_message(filters.command("stats") & filters.user(OWNER_ID))
 def stats(client, message):
-    total_users = users_collection.count_documents({})
-    pushpa_downloads = downloads_collection.count_documents({"movie": "Pushpa 2"})
-    kanguva_downloads = downloads_collection.count_documents({"movie": "Kanguva"})
+    total_users = db.users.count_documents({})
+    pushpa_downloads = db.downloads.count_documents({"movie": "Pushpa 2"})
+    kanguva_downloads = db.downloads.count_documents({"movie": "Kanguva"})
 
     message.reply(
-        f"Total Users: {total_users}\n"
-        f"Pushpa 2 Downloads: {pushpa_downloads}\n"
-        f"Kanguva Downloads: {kanguva_downloads}"
+        f"📊 **Bot Stats**:\n\n"
+        f"👤 Total Users: {total_users}\n"
+        f"🎬 Pushpa 2 Downloads: {pushpa_downloads}\n"
+        f"🎬 Kanguva Downloads: {kanguva_downloads}"
     )
 
-# Start the bot
-bot.run()
+# Start the bot (blocking call)
+if __name__ == "__main__":
+    bot.run()  # This is a blocking call that will keep the bot running
