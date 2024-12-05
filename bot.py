@@ -24,6 +24,9 @@ db = client["telegram_movie_bot"]
 movies_collection = db["movies"]
 stats_collection = db["stats"]
 
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+
 # Start Command with Welcome Image
 @bot.on_message(filters.command("start"))
 def start(client, message):
@@ -56,7 +59,7 @@ def start(client, message):
 def movies_menu(client, query: CallbackQuery):
     # Edit the message to include a photo and menu
     query.message.edit_media(
-        media=types.InputMediaPhoto(
+        media=InputMediaPhoto(
             media="https://graph.org/file/8e4cde401593ac8ff61cb-ce171592c3ee5635c8.jpg",  # Replace with your image URL
             caption="🎬 **Choose a movie to watch or download:**"
         ),
