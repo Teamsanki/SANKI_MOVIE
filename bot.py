@@ -29,11 +29,11 @@ deployments_collection = db["deployments"]
 # Movie Data (Add movie file link and trailer link for both movies)
 movie_data = {
     "Pushpa 2": {
-        "movie_file_link": "https://video-downloads.googleusercontent.com/ADGPM2micKYSN26lUtrrrzGfpYoUrb5oOuK818ZfQqOMo7v2i9Y_3XizBaCEqu71l0242lV-zOXEDTMMfseAMsVJDG0fhtQOSHSmM9JSRm4F-amxbOCYdU9nKB4L6iv2sRPZwxjpoQ83e2PzSz2ZB_XP7ccpeB73EPbYcpyU2YdEyZY4qDKtd6uU5Stej0_1dP-my6MxLuR7fJ3xsx9HO4i1oRkixGDIDQ5OnCH6d4PmECANajVZm17mrAPPac3fijYDEexMROoGIwfpbhLQSjBBylWH2absZKt6aeEkQr06ZaSGbNUe3ELMv7qeh7LRB0Qi3_uEMwLxlQ28faR-u4dyIw4JSSmuBWWGY3DjURibIys0PT5mW1B1anbTDONsVCd06Cx-oBPhZAIAmctMKCtpEgyUnGS2FmV-_WyTXGmiWGUdobwaeuxT-ZjcrfJ__i61OyC2s3Uka82PCl1LZ8V4QprYqHoqpEAOJL4jOAUtWx4jiUrmsX7vZBa1C5H1cMoYn-87OD_6F6KuIutZZZ8z_I04b5SpOZuYlLZNSLSGmv-IbNxb7_g8L0tq3pcf1DhUggdxqr1Sz3tt7BjRiHUsuXv3PknIq7oSqLTe6myowmaTgAY_hykNbK0UijWqSPoa2sic2dmhyzgM1Ne7YOFYZh42nAvluwQsbji4Cgawq7rz3ypP0ukNQrZu58Yl7KIWxWm13cscXTxDy4-MCGrCuUZmXLrypYrMM1ZuGMmYEvdc4w0MKAQhKLSPDGoD8QsjhnCwxwAage1ymbCqk_7sG_-Wov3HBpJyJCD_U7gwdAsvUiW6kQgJnvdtpbU5SrWwj0TSd1_F9bG2g9-saCTqSdmBa-3YC8SCH7fBP7GLPKEU1j4QiZb8Ymgkc4P24Azm9dOIfSSpHNZztN2RjpGgiOB_CzM3kOk11pj_DGuBEUrbdZ4UA2tolJb0GRXDXCMU8OGsDtdxAREznt639HYBNMNMhP20y3A89ReWuiHUJrVxC4Bx9qrKzE0h8K1j-Myi67nygW7E5EDXl4GhxenH_Zkq7eCb7zFDPAsQfAyLvhvbTGmGId00v5jwJ-Anaw47eZ6Dhlu6",  # Replace with the actual movie file link
+        "movie_file_link": "https://t.me/c/2267313247/64",  # Replace with the actual movie file link
         "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FPushpa%202%20-%20The%20Rule%20Trailer%20(Hindi)%20_%20Allu%20Arjun%20_%20Sukumar%20_%20Rashmika%20Mandanna%20_%20Fahadh%20Faasil%20_%20DSP%20-%20T-Series%20(1080p%2C%20h264%2C%20youtube).mp4?alt=media&token=090765bc-fade-451a-9e6f-2c27c7c8a0d7"  # Replace with the actual trailer link
     },
     "Kanguva": {
-        "movie_file_link": "https://pixeldra.in/api/file/prD8PBCb?download",  # Replace with the actual movie file link
+        "movie_file_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0",  # Replace with the actual movie file link
         "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0"  # Replace with the actual trailer link
     }
 }
