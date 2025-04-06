@@ -273,6 +273,73 @@ async def accept_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Logic to start the game goes here
     await update.message.reply_text("Challenge accepted! Starting the game...")
+
+    # Initialize game state
+    word = random.choice(WORDS)
+    hint = f"Starts with '{word[0]}'"
+
+    games_col.update_one(
+        {"chat_id": chat_id},
+        {"$set": {
+            "word": word,
+            "hint": hint,
+            "guesses": [],
+            "start_time": datetime.utcnow()
+        }},
+        upsert=True
+    )
+
+    await update.message.reply_text("New game started! Guess the 4-letter word.")
+
+    # Handle guesses
+    async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        chat_id = update.effective_chat.id
+        game = games_col.find_one({"chat_id": chat_id})
+        if not game:
+            return  # Game not running, ignore all messages
+
+        user = update.effective_user
+        text = update.message.text.lower()
+
+        if not text.isalpha() or len(text) != 4:
+            return
+
+        if text not in WORDS:
+            await update.message.reply_text("This word is not in my dictionary.")
+            return
+
+        correct_word = game["word"]
+        guesses = game.get("guesses", [])
+
+        if text in guesses:
+            return
+
+        guesses.append(text)
+        games_col.update_one({"chat_id": chat_id}, {"$set": {"guesses": guesses}})
+        feedback = format_feedback(text, correct_word)
+        await update.message.reply_text(f"{feedback} {text}", parse_mode="Markdown")
+
+        if text == correct_word:
+            now = datetime.utcnow()
+
+            scores_col.update_one(
+                {"chat_id": chat_id, "user_id": user.id},
+                {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+                upsert=True
+            )
+            scores_col.update_one(
+                {"chat_id": "global", "user_id": user.id},
+                {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+                upsert=True
+            )
+
+            summary = build_summary(guesses, correct_word, game.get("hint", ""))
+            await update.message.reply_text(f"👻 *{user.first_name} guessed it right!*\n\n{summary}", parse_mode="Markdown")
+            await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
+            games_col.delete_one({"chat_id": chat_id})
+
+    # Add handler for guesses
+    
     # You can then initialize the game state here
 
 # --- /leaderboard ---
@@ -294,8 +361,6 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Choose a leaderboard:", reply_markup=reply_markup)
 
-# --- Leaderboard
-
 # --- Leaderboard callback ---
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -303,19 +368,27 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     data = query.data
 
     if data.startswith("lb_today_"):
-        # Existing logic for today's leaderboard
-        ...
+        chat_id = int(data.split("_")[2])
+        since = datetime.utcnow() - timedelta(days=1)
+        pipeline = [
+            {"$match": {"chat_id": chat_id, "updated": {"$gte": since}}},
+            {"$group": {"_id": "$user_id", "score": {"$max": "$score"}, "name": {"$first": "$name"}}},
+            {"$sort": {"score": -1}},
+            {"$limit": 10}
+        ]
+        results = list(scores_col.aggregate(pipeline))
+        title = "📅 Today's Leaderboard"
 
     elif data.startswith("lb_overall_"):
-        # Existing logic for overall leaderboard
-        ...
+        chat_id = int(data.split("_")[2])
+        results = list(scores_col.find({"chat_id": chat_id}).sort("score", -1).limit(10))
+        title = "🏆 Overall Leaderboard"
 
     elif data == "lb_global":
-        # Existing logic for global leaderboard
-        ...
+        results = list(scores_col.find({"chat_id": "global"}).sort("score", -1).limit(10))
+        title = "🌍 Global Leaderboard"
 
     elif data == "lb_multiplayer":
-        # Logic for multiplayer leaderboard
         results = list(scores_col.find({"chat_id": "multiplayer"}).sort("score", -1).limit(10))
         title = "🎮 Multiplayer Leaderboard"
 
@@ -330,11 +403,7 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text("No scores found.")
         return
 
-    msg = f"__{title}__\n"
-    for idx, row in enumerate(results, 1):
-        msg += f"> {idx}. *{row['name']}* — {row['score']} pts\n"
-
-    await query.edit_message_text(msg, parse_mode="Markdown")
+    msg = f
 
 # --- Main ---
 if __name__ == "__main__":
