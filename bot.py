@@ -275,21 +275,32 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Send feedback to all players
     await context.bot.send_message(chat_id=chat_id, text=f"{feedback} {text} by {user.first_name}", parse_mode="Markdown")
 
+    # Check if the guess is correct
     if text == correct_word:
         now = datetime.utcnow()
 
-        # Update scores for both players
-        for player_id in game["players"]:
-            scores_col.update_one(
-                {"chat_id": chat_id, "user_id": player_id},
-                {"$set": {"name": context.bot.get_chat_member(chat_id, player_id).user.first_name, "updated": now}, "$inc": {"score": 25}},
-                upsert=True
-            )
+        # Update scores for the winner
+        scores_col.update_one(
+            {"chat_id": chat_id, "user_id": user.id},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+            upsert=True
+        )
+        scores_col.update_one(
+            {"chat_id": "global", "user_id": user.id},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc : {"score": 25}},
+            upsert=True
+        )
 
-        summary = build_summary(guesses, correct_word, game.get("hint", ""))
-        await context.bot.send_message(chat_id=chat_id, text=f"👻 *{user.first_name} guessed it right!*\n\n{summary}", parse_mode="Markdown")
-        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations {user.first_name}! You've guessed the word '{correct_word}'! The game is over.")
+        # Clean up the game data
         games_col.delete_one({"chat_id": chat_id})
+        # Remove players from active users
+        del active_users[user.id]
+        del active_users[opponent_id]
+    else:
+        # Notify the other player about the guess
+        opponent_id = next(user_id for user_id in game["players"] if user_id != user.id)
+        await context.bot.send_message(chat_id=opponent_id, text=f"{user.first_name} guessed '{text}' but it's not correct. Keep trying!")
 
 # --- /leaderboard ---
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
