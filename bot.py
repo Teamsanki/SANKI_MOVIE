@@ -286,11 +286,10 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
             upsert=True
         )
         scores_col.update_one(
-            {"chat_id": "global", "user_id": user.id},
-            {"$set": {"name": user.first_name, "updated": now}, "$inc : {"score": 25}},
-            upsert=True
-        )
-
+    {"chat_id": "global", "user_id": user.id},
+    {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+    upsert=True
+)
         await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations {user.first_name}! You've guessed the word '{correct_word}'! The game is over.")
         # Clean up the game data
         games_col.delete_one({"chat_id": chat_id})
