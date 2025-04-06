@@ -249,7 +249,7 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return  # Game not running, ignore all messages
 
-    user = update.effective _user
+    user = update.effective_user  # Corrected line
     text = update.message.text.lower()
 
     # Check if the guess is valid
