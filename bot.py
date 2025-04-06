@@ -234,20 +234,47 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
         games_col.delete_one({"chat_id": chat_id})
 
+# Global variable to store active users
+active_users = set()
+
 # --- /search command ---
 async def search_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    # Logic to find a random opponent (this can be improved)
-    opponent_id = random.choice([user.id for user in context.bot.get_chat_members(chat_id) if user.id != user_id])
+    # Add the user to the active users set
+    active_users.add(user_id)
+
+    # Check if there are other active users to challenge
+    if len(active_users) < 2:
+        await update.message.reply_text("Waiting for another player to join. Please try again later.")
+        return
+
+    # Remove the current user from the list of potential opponents
+    potential_opponents = list(active_users - {user_id})
+
+    # Randomly select an opponent
+    opponent_id = random.choice(potential_opponents)
 
     await context.bot.send_message(
         chat_id=opponent_id,
         text=f"You have been challenged by {update.effective_user.first_name} for a 1v1 match! Type /accept to join."
     )
     await update.message.reply_text(f"Challenged {opponent_id} for a 1v1 match!")
-    
+
+# --- /accept command ---
+async def accept_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    if user_id not in active_users:
+        await update.message.reply_text("You have not been challenged. Please wait for a challenge.")
+        return
+
+    # Logic to start the game goes here
+    await update.message.reply_text("Challenge accepted! Starting the game...")
+    # You can then initialize the game state here
+
 # --- /leaderboard ---
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -266,6 +293,8 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Choose a leaderboard:", reply_markup=reply_markup)
+
+# --- Leaderboard
 
 # --- Leaderboard callback ---
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,7 +344,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("new", new_game))
     app.add_handler(CommandHandler("stop", stop_game))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(CommandHandler("search", search_opponent))  # New command
+    app.add_handler(CommandHandler("search", search_opponent))
+    app.add_handler(CommandHandler("accept", accept_challenge))  # New command# New command
     app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^lb_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_guess))
 
