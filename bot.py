@@ -1,207 +1,323 @@
-import logging
-import asyncio
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
-import pymongo
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
+from pymongo import MongoClient
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
 
-# Configurations
-API_ID = "27763335"  # Replace with your API ID
-API_HASH = "339bc57607286baa0d68a97a692329f0"  # Replace with your API HASH
-BOT_TOKEN = "7661592174:AAGxGsJsO-6pck4NN7m_2uFmKoum2Yy52wM"  # Replace with your Bot Token
-MONGO_URI = "mongodb+srv://Teamsanki:Teamsanki@cluster0.jxme6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # MongoDB URI
-CHANNEL_LINK = "https://t.me/matalbi_duniya"  # Your channel link
-OWNER_ID = 7877197608  # Owner's Telegram ID
-LOGGER_GROUP = -1002100433415  # Log group ID
+# --- Bot Config ---
+TOKEN = "7762113593:AAHEhm8iuyf4W0VfnF0MkifOeW2zCOfrMVo"  # <-- Replace this with your bot token
+MONGO_URL = "mongodb+srv://TSANKI:TSANKI@cluster0.u2eg9e1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # <-- Replace this with your MongoDB connection string
+WELCOME_IMAGE_URL = "https://graph.org/file/c0e17724e66a68a2de3a6-5ff173af1d3498d9e7.jpg"  # <-- Replace with your welcome image
 
-logging.basicConfig(level=logging.INFO)
+# --- MongoDB Setup ---
+client = MongoClient(MONGO_URL)
+db = client["wordseekbot"]
+games_col = db["games"]
+scores_col = db["scores"]
 
-bot = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# --- Word List ---
+WORDS = [
+    # A
+    'able', 'acid', 'aged', 'also', 'area', 'army', 'atom', 'aunt', 'away', 'axis', 'amit', 'dick', 'slap', 'crow',
+    # B
+    'baby', 'back', 'bake', 'ball', 'band', 'bank', 'barn', 'base', 'bath', 'bear',
+    'beat', 'been', 'bell', 'belt', 'bend', 'best', 'bike', 'bill', 'bird', 'bite',
+    'blue', 'boat', 'body', 'bomb', 'bond', 'bone', 'book', 'boom', 'boot', 'bore',
+    'born', 'boss', 'both', 'bowl', 'brag', 'bray', 'bred', 'brew', 'brim', 'buck',
+    'buff', 'bulk', 'bull', 'bump', 'burn', 'bush', 'busy', 'buzz', 'byte',
+    # C
+    'cage', 'cake', 'call', 'calm', 'camp', 'card', 'care', 'cart', 'case', 'cash',
+    'cast', 'cave', 'cell', 'chat', 'chip', 'city', 'clay', 'club', 'coal', 'coat',
+    'cold', 'come', 'cook', 'cool', 'cope', 'cord', 'core', 'cost', 'crew', 'crop',
+    'curl', 'cute', 'chill'
+    # D
+    'dark', 'data', 'date', 'dawn', 'deal', 'debt', 'deep', 'deer', 'desk', 'dial',
+    'dice', 'died', 'diet', 'dime', 'dine', 'dish', 'disk', 'dive', 'dock', 'does',
+    'doge', 'dome', 'done', 'doom', 'door', 'dose', 'down', 'drag', 'draw', 'drop',
+    'drum', 'dual', 'duck', 'duke', 'dull', 'dust', 'duty',
+    # E
+    'each', 'earn', 'ease', 'east', 'easy', 'edge', 'edit', 'else', 'envy', 'epic',
+    'even', 'ever', 'evil', 'exam', 'exit', 'eyes',
+    # F
+    'face', 'fact', 'fade', 'fail', 'fair', 'fake', 'fall', 'fame', 'farm', 'fast',
+    'fate', 'fear', 'feed', 'feel', 'feet', 'fell', 'felt', 'file', 'fill', 'film',
+    'find', 'fine', 'fire', 'firm', 'fish', 'fist', 'five', 'flag', 'flat', 'flip',
+    'flow', 'fold', 'folk', 'food', 'foot', 'form', 'fort', 'four', 'free', 'frog',
+    'fuel', 'full', 'fund', 'fuse',
+    # G
+    'gain', 'game', 'gang', 'gate', 'gave', 'gear', 'gene', 'gift', 'girl', 'give',
+    'glad', 'goal', 'goat', 'gold', 'golf', 'gone', 'good', 'grab', 'gray', 'grew',
+    'grid', 'grim', 'grip', 'grow', 'gulf', 'guts',
+    # H
+    'hair', 'half', 'hall', 'hand', 'hang', 'hard', 'harm', 'hate', 'have', 'hawk',
+    'head', 'heal', 'heap', 'hear', 'heat', 'held', 'hell', 'help', 'herb', 'hero',
+    'hide', 'high', 'hill', 'hire', 'hold', 'hole', 'holy', 'home', 'hope', 'horn',
+    'host', 'hour', 'huge', 'hung', 'hunt', 'hurt',
+    # I
+    'idea', 'idle', 'inch', 'into', 'iron', 'item',
+    # J
+    'jack', 'jade', 'jail', 'jazz', 'jeep', 'jest', 'join', 'joke', 'jump', 'jury',
+    # K
+    'keep', 'kept', 'kick', 'kill', 'kind', 'king', 'kiss', 'kite', 'knee', 'knew',
+    'knit', 'know',
+    # L
+    'lack', 'lady', 'lake', 'lamp', 'land', 'lane', 'last', 'late', 'lava', 'lazy',
+    'lead', 'leaf', 'left', 'lend', 'less', 'life', 'lift', 'like', 'limb', 'line',
+    'link', 'lion', 'list', 'live', 'load', 'loan', 'lock', 'logo', 'long', 'look',
+    'loop', 'lord', 'lose', 'loss', 'lost', 'love', 'luck', 'lung',
+    # M
+    'made', 'mail', 'main', 'make', 'male', 'mall', 'many', 'mark', 'mask', 'mass',
+    'mate', 'meal', 'mean', 'meat', 'meet', 'melt', 'menu', 'mere', 'mice', 'mild',
+    'mile', 'milk', 'mill', 'mind', 'mine', 'mint', 'miss', 'mist', 'mode', 'mood',
+    'moon', 'more', 'most', 'move', 'much', 'must', 'myth',
+    # N
+    'name', 'navy', 'near', 'neck', 'need', 'nest', 'news', 'next', 'nice', 'nick',
+    'nine', 'node', 'none', 'noon', 'nose', 'note', 'noun', 'nuts',
+    # O
+    'oath', 'obey', 'omit', 'once', 'only', 'onto', 'open', 'oral', 'ours', 'oval',
+    'oven', 'over', 'owed', 'own',
+    # P
+    'pack', 'page', 'paid', 'pain', 'pair', 'palm', 'park', 'part', 'pass', 'past',
+    'path', 'peak', 'pear', 'peel', 'peer', 'peny', 'pick', 'pile', 'pill', 'pine',
+    'pink', 'pipe', 'plan', 'play', 'plot', 'plug', 'plus', 'poem', 'pole', 'poll',
+    'pond', 'pool', 'poor', 'port', 'post', 'pull', 'pure', 'push', 'pins', 
+    # Q
+    'quad', 'quiz', 'quit', 'quip',
+    # R
+    'race', 'rack', 'rage', 'raid', 'rail', 'rain', 'rank', 'rate', 'rays', 'read',
+    'real', 'rear', 'redo', 'reed', 'reef', 'rest', 'rice', 'rich', 'ride', 'ring',
+    'riot', 'rise', 'risk', 'road', 'rock', 'role', 'roof', 'room', 'root', 'rope',
+    'rose', 'rule', 'rush', 'rust',
+    # S
+    'safe', 'said', 'sail', 'salt', 'same', 'sand', 'save', 'scan', 'scar', 'seal',
+    'seat', 'seed', 'seek', 'seem', 'seen', 'self', 'sell', 'send', 'ship', 'shop',
+    'shot', 'show', 'shut', 'side', 'sign', 'silk', 'sink', 'site', 'size', 'slip',
+    'slow', 'snap', 'snow', 'soap', 'soft', 'soil', 'sold', 'sole', 'some', 'song',
+    'soon', 'sort', 'soul', 'spot', 'star', 'stay', 'step', 'stop', 'such', 'suit', 'smag',
+    'sure', 'swim', 'sync',
+    # T
+    'tail', 'take', 'tale', 'talk', 'tall', 'tank', 'tape', 'task', 'team', 'tear',
+    'tech', 'tell', 'tend', 'tent', 'term', 'test', 'text', 'than', 'that', 'them',
+    'then', 'they', 'thin', 'this', 'thus', 'time', 'tire', 'told', 'toll', 'tone',
+    'tool', 'tops', 'torn', 'tour', 'town', 'trap', 'tree', 'trip', 'true', 'tube',
+    'tune', 'turn', 'twin', 'type',
+    # U
+    'ugly', 'unit', 'urge', 'used', 'user', 'upon',
+    # V
+    'vain', 'vast', 'veil', 'verb', 'very', 'vest', 'view', 'vine', 'visa', 'vote',
+    # W
+    'wage', 'wait', 'wake', 'walk', 'wall', 'want', 'ward', 'warm', 'warn', 'wash',
+    'wave', 'weak', 'wear', 'weed', 'week', 'well', 'west', 'what', 'when', 'whip',
+    'wide', 'wife', 'wild', 'will', 'wind', 'wine', 'wing', 'wink', 'wipe', 'wire',
+    'wise', 'wish', 'wolf', 'wood', 'word', 'worn', 'wrap', 'work',
+    # X
+    'xray',
+    # Y
+    'yard', 'yarn', 'yawn', 'yeah', 'year', 'yell', 'your', 'yoga',
+    # Z
+    'zero', 'zinc', 'zone', 'zoom'
+]
 
-# MongoDB Setup
-client = pymongo.MongoClient(MONGO_URI)
-db = client["telegram_movie_bot"]
-movies_collection = db["movies"]
-stats_collection = db["stats"]
-user_collection = db["users"]
-deployments_collection = db["deployments"]
+# --- Format Feedback ---
+def format_feedback(guess: str, correct_word: str) -> str:
+    feedback = []
+    for i in range(4):
+        if guess[i] == correct_word[i]:
+            feedback.append("🟩")
+        elif guess[i] in correct_word:
+            feedback.append("🟨")
+        else:
+            feedback.append("🟥")
+    return ''.join(feedback)
 
-# Movie Data (Add movie file link and trailer link for both movies)
-movie_data = {
-    "Pushpa 2": {
-        "movie_file_link": "https://t.me/c/2267313247/64",  # Replace with the actual movie file link
-        "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FPushpa%202%20-%20The%20Rule%20Trailer%20(Hindi)%20_%20Allu%20Arjun%20_%20Sukumar%20_%20Rashmika%20Mandanna%20_%20Fahadh%20Faasil%20_%20DSP%20-%20T-Series%20(1080p%2C%20h264%2C%20youtube).mp4?alt=media&token=090765bc-fade-451a-9e6f-2c27c7c8a0d7"  # Replace with the actual trailer link
-    },
-    "Kanguva": {
-        "movie_file_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0",  # Replace with the actual movie file link
-        "trailer_link": "https://firebasestorage.googleapis.com/v0/b/social-bite-skofficial.appspot.com/o/Private%2Ftrlir%2FKanguva%20-%20Hindi%20Trailer%20%20Suriya%20%20Bobby%20Deol%20%20Devi%20Sri%20Prasad%20%20Siva%20%20Studio%20Green%20%20UV%20Creations.mp4?alt=media&token=c525079c-3e33-4252-94fb-c4eed4d594b0"  # Replace with the actual trailer link
-    }
-}
+# --- Build Summary ---
+def build_summary(guesses: list[str], correct_word: str, hint: str) -> str:
+    summary = ""
+    for guess in guesses:
+        feedback = format_feedback(guess, correct_word)
+        summary += f"{feedback} `{guess}`\n"
+    summary += f"\n_\"{hint}\"_\n"
+    return summary
 
-# Log all user interactions
-def log_user_action(user_id, action):
-    logging.info(f"User {user_id} performed action: {action}")
+# --- /start welcome ---
+async def send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    keyboard = [[InlineKeyboardButton("Start Game", callback_data="/new")]]
+    markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.send_photo(
+        chat_id=chat.id,
+        photo=WELCOME_IMAGE_URL,
+        caption="Welcome to *Four Word*! Guess 4-letter words with color feedback.\nUse /new to begin. Owner @SANKINETWORK ",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
 
-# Start Command with Welcome Image
-@bot.on_message(filters.command("start"))
-def start(client, message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
+# --- /new game ---
+async def new_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    word = random.choice(WORDS)
+    hint = f"Starts with '{word[0]}'"
 
-    # Record unique user interaction
-    user_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"user_name": user_name, "last_interacted": datetime.now()}},
+    games_col.update_one(
+        {"chat_id": chat_id},
+        {"$set": {
+            "word": word,
+            "hint": hint,
+            "guesses": [],
+            "start_time": datetime.utcnow()
+        }},
         upsert=True
     )
+    await update.message.reply_text("New game started! Guess the 4-letter word.")
 
-    log_user_action(user_id, "start")
+# --- /stop game ---
+async def stop_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    games_col.delete_one({"chat_id": chat_id})
+    await update.message.reply_text("Game stopped. Use /new to start a new one.")
 
-    # Send a log message to the log group
-    bot.send_message(
-        chat_id=LOGGER_GROUP,
-        text=f"📝 New user started the bot:\n"
-             f"**User ID**: {user_id}\n"
-             f"**Username**: {user_name}\n"
-             f"**First Name**: {message.from_user.first_name}\n"
-             f"**Last Name**: {message.from_user.last_name if message.from_user.last_name else 'N/A'}",
-    )
+# --- Handle guesses ---
+async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    game = games_col.find_one({"chat_id": chat_id})
+    if not game:
+        return  # Game not running, ignore all messages
 
-    # Send Welcome Image
-    message.reply_photo(
-        photo="https://graph.org/file/6c0db28a848ed4dacae56-93b1bc1873b2494eb2.jpg",  # Replace with your welcome image URL
-        caption=f"🎉 Welcome to the Movie Bot, {user_name}!\n\n"
-                f"Click below to explore movies or join our channel:",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Movies", callback_data="movies")],
-                [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)],
-            ]
-        ),
-    )
+    user = update.effective_user
+    text = update.message.text.lower()
 
-# Stats Command
-@bot.on_message(filters.command("stats"))
-def stats(client, message):
-    if message.from_user.id != OWNER_ID:
-        message.reply("You are not authorized to view stats.")
+    if not text.isalpha() or len(text) != 4:
         return
 
-    # Fetch total bot users
-    total_users = user_collection.count_documents({})
+    if text not in WORDS:
+        await update.message.reply_text("This word is not in my dictionary.")
+        return
 
-    # Fetch total deployments and download counts for each movie
-    total_deployments = deployments_collection.find_one({"bot_deployed": True})["deployment_count"]
+    correct_word = game["word"]
+    guesses = game.get("guesses", [])
+
+    if text in guesses:
+        return
+
+    guesses.append(text)
+    games_col.update_one({"chat_id": chat_id}, {"$set": {"guesses": guesses}})
+    feedback = format_feedback(text, correct_word)
+    await update.message.reply_text(f"{feedback} {text}", parse_mode="Markdown")
+
+    if text == correct_word:
+        now = datetime.utcnow()
+
+        scores_col.update_one(
+            {"chat_id": chat_id, "user_id": user.id},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
+            upsert=True
+        )
+        scores_col.update_one(
+            {"chat_id": "global", "user_id": user.id},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
+            upsert=True
+        )
+
+        summary = build_summary(guesses, correct_word, game.get("hint", ""))
+        await update.message.reply_text(f"👻 *{user.first_name} guessed it right!*\n\n{summary}", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
+        games_col.delete_one({"chat_id": chat_id})
+
+# --- /search command ---
+async def search_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # Logic to find a random opponent (this can be improved)
+    opponent_id = random.choice([user.id for user in context.bot.get_chat_members(chat_id) if user.id != user_id])
+
+    await context.bot.send_message(
+        chat_id=opponent_id,
+        text=f"You have been challenged by {update.effective_user.first_name} for a 1v1 match! Type /accept to join."
+    )
+    await update.message.reply_text(f"Challenged {opponent_id} for a 1v1 match!")
     
-    # Fetch movie stats and handle missing data
-    pushpa2_stat = stats_collection.find_one({"movie": "Pushpa 2"})
-    kanguva_stat = stats_collection.find_one({"movie": "Kanguva"})
+# --- /leaderboard ---
+async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    keyboard = [
+        [
+            InlineKeyboardButton("🌍 Global", callback_data="lb_global"),
+            InlineKeyboardButton("🏆 Overall", callback_data=f"lb_overall_{chat_id}")
+        ],
+        [
+            InlineKeyboardButton("📅 Today", callback_data=f"lb_today_{chat_id}"),
+            InlineKeyboardButton("🎮 Multiplayer", callback_data="lb_multiplayer")
+        ],
+        [
+            InlineKeyboardButton("❌ Close", callback_data="close")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Choose a leaderboard:", reply_markup=reply_markup)
 
-    pushpa2_downloads = pushpa2_stat["downloads"] if pushpa2_stat else 0
-    kanguva_downloads = kanguva_stat["downloads"] if kanguva_stat else 0
+# --- Leaderboard callback ---
+async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
 
-    message.reply(f"Total Users: {total_users}\nTotal Deployments: {total_deployments}\n"
-                  f"Pushpa 2 Downloads: {pushpa2_downloads}\nKanguva Downloads: {kanguva_downloads}")
+    if data.startswith("lb_today_"):
+        # Existing logic for today's leaderboard
+        ...
 
-# Callback Query Handler for Movie Options
-@bot.on_callback_query(filters.regex("^movies$"))
-async def show_movies(client, callback_query):
-    await callback_query.answer()  # Acknowledge the callback
-    await callback_query.message.edit_text(
-        "🎬 Choose a movie to explore:",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Pushpa 2", callback_data="pushpa2")],
-                [InlineKeyboardButton("Kanguva", callback_data="kanguva")],
-                [InlineKeyboardButton("Back", callback_data="back")]
-            ]
-        ),
-    )
+    elif data.startswith("lb_overall_"):
+        # Existing logic for overall leaderboard
+        ...
 
-# Handle Pushpa 2 Movie Button
-@bot.on_callback_query(filters.regex("^pushpa2$"))
-async def pushpa2_movie(client, callback_query):
-    await callback_query.answer()  # Acknowledge the callback
+    elif data == "lb_global":
+        # Existing logic for global leaderboard
+        ...
 
-    log_user_action(callback_query.from_user.id, "clicked on Pushpa 2")
+    elif data == "lb_multiplayer":
+        # Logic for multiplayer leaderboard
+        results = list(scores_col.find({"chat_id": "multiplayer"}).sort("score", -1).limit(10))
+        title = "🎮 Multiplayer Leaderboard"
 
-    movie_info = movie_data["Pushpa 2"]
+    elif data == "close":
+        await query.edit_message_text("Leaderboard closed.")
+        return
 
-    # Add a delay of 5 seconds before sending the movie
-    await callback_query.message.edit_text("⏳ Please wait while we prepare the movie...")
-
-    await asyncio.sleep(5)
-
-    # Check if the movie file URL is valid (it should be publicly accessible)
-    if movie_info['movie_file_link'].startswith("https://"):
-        # Send the movie file directly to the user as an attachment for download
-        try:
-            await client.send_document(
-                chat_id=callback_query.from_user.id,
-                document=movie_info['movie_file_link'],  # The direct MP4 file link
-                caption="🎬 **Pushpa 2** - Here is your movie for download!",
-            )
-        except Exception as e:
-            await callback_query.message.edit_text(f"❌ Failed to send movie. Error: {str(e)}")
     else:
-        await callback_query.message.edit_text("❌ Invalid movie file link. Please try again later.")
+        return
 
-    # Update download stats
-    stats_collection.update_one(
-        {"movie": "Pushpa 2"},
-        {"$inc": {"downloads": 1}},
-        upsert=True
-    )
+    if not results:
+        await query.edit_message_text("No scores found.")
+        return
 
-    # Send the trailer link if needed
-    await callback_query.message.edit_text(
-        f"🎬 **Pushpa 2**\n\n"
-        f"Trailer: [Watch Trailer](<{movie_info['trailer_link']}>)",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Back", callback_data="movies")]
-            ]
-        ),
-    )
+    msg = f"__{title}__\n"
+    for idx, row in enumerate(results, 1):
+        msg += f"> {idx}. *{row['name']}* — {row['score']} pts\n"
 
-# Handle Kanguva Movie Button
-@bot.on_callback_query(filters.regex("^kanguva$"))
-async def kanguva_movie(client, callback_query):
-    await callback_query.answer()  # Acknowledge the callback
+    await query.edit_message_text(msg, parse_mode="Markdown")
 
-    log_user_action(callback_query.from_user.id, "clicked on Kanguva")
+# --- Main ---
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    movie_info = movie_data["Kanguva"]
+    app.add_handler(CommandHandler("start", send_welcome))
+    app.add_handler(CommandHandler("new", new_game))
+    app.add_handler(CommandHandler("stop", stop_game))
+    app.add_handler(CommandHandler("leaderboard", leaderboard))
+    app.add_handler(CommandHandler("search", search_opponent))  # New command
+    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^lb_"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_guess))
 
-    # Add a delay of 5 seconds before sending the movie
-    await callback_query.message.edit_text("⏳ Please wait while we prepare the movie...")
-
-    await asyncio.sleep(5)
-
-    # Send the movie file directly to the user as an attachment for download
-    await client.send_document(
-        chat_id=callback_query.from_user.id,
-        document=movie_info['movie_file_link'],  # The direct MP4 file link
-        caption="🎬 **Kanguva** - Here is your movie for download!",
-    )
-
-    # Update download stats
-    stats_collection.update_one(
-        {"movie": "Kanguva"},
-        {"$inc": {"downloads": 1}},
-        upsert=True
-    )
-
-    # Send the trailer link if needed
-    await callback_query.message.edit_text(
-        f"🎬 **Kanguva**\n\n"
-        f"Trailer: [Watch Trailer](<{movie_info['trailer_link']}>)",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Back", callback_data="movies")]
-            ]
-        ),
-    )
-
-# Run the bot
-bot.run()
+    print("Bot is running...")
+    app.run_polling()
