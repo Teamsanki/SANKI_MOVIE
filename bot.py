@@ -221,10 +221,10 @@ async def search_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(10)
 
     # Start the game
-    await start_game(chat_id, user_id, opponent_id)
+    await start_game(chat_id, user_id, opponent_id, context)
 
 # --- Start Game ---
-async def start_game(chat_id, user_id, opponent_id):
+async def start_game(chat_id, user_id, opponent_id, context):
     word = random.choice(WORDS)
     hint = f"Starts with '{word[0]}'"
 
@@ -249,7 +249,7 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return  # Game not running, ignore all messages
 
-    user = update.effective_user
+    user = update.effective _user
     text = update.message.text.lower()
 
     # Check if the guess is valid
@@ -286,10 +286,11 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
             upsert=True
         )
         scores_col.update_one(
-    {"chat_id": "global", "user_id": user.id},
-    {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
-    upsert=True
-)
+            {"chat_id": "global", "user_id": user.id},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+            upsert=True
+        )
+
         await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations {user.first_name}! You've guessed the word '{correct_word}'! The game is over.")
         # Clean up the game data
         games_col.delete_one({"chat_id": chat_id})
