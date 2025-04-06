@@ -14,6 +14,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+import asyncio  # Import asyncio for sleep functionality
 
 # --- Bot Config ---
 TOKEN = "7364490758:AAFQHSTWOfFxxebzOpP_O_lLakaYPLYNkDo"  # <-- Replace this with your bot token
@@ -126,8 +127,7 @@ WORDS = [
     # Y
     'yard', 'yarn', 'yawn', 'yeah', 'year', 'yell', 'your', 'yoga',
     # Z
-    'zero', 'zinc', 'zone', 'zoom'
-]
+    'zero', 'zinc', 'zone', 'zoom']  # Your word list here
 
 # --- Format Feedback ---
 def format_feedback(guess: str, correct_word: str) -> str:
@@ -187,102 +187,47 @@ async def stop_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games_col.delete_one({"chat_id": chat_id})
     await update.message.reply_text("Game stopped. Use /new to start a new one.")
 
-# --- Handle guesses ---
-async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    game = games_col.find_one({"chat_id": chat_id})
-    if not game:
-        return  # Game not running, ignore all messages
-
-    user = update.effective_user
-    text = update.message.text.lower()
-
-    if not text.isalpha() or len(text) != 4:
-        return
-
-    if text not in WORDS:
-        await update.message.reply_text("This word is not in my dictionary.")
-        return
-
-    correct_word = game["word"]
-    guesses = game.get("guesses", [])
-
-    if text in guesses:
-        return
-
-    guesses.append(text)
-    games_col.update_one({"chat_id": chat_id}, {"$set": {"guesses": guesses}})
-    feedback = format_feedback(text, correct_word)
-    await update.message.reply_text(f"{feedback} {text}", parse_mode="Markdown")
-
-    if text == correct_word:
-        now = datetime.utcnow()
-
-        scores_col.update_one(
-            {"chat_id": chat_id, "user_id": user.id},
-            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
-            upsert=True
-        )
-        scores_col.update_one(
-            {"chat_id": "global", "user_id": user.id},
-            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
-            upsert=True
-        )
-
-        summary = build_summary(guesses, correct_word, game.get("hint", ""))
-        await update.message.reply_text(f"👻 *{user.first_name} guessed it right!*\n\n{summary}", parse_mode="Markdown")
-        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
-        games_col.delete_one({"chat_id": chat_id})
-
 # Global variable to store active users
-active_users = set()
+active_users = {}
 
 # --- /search command ---
 async def search_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    # Add the user to the active users set
-    active_users.add(user_id)
+    # Add the user to the active users dictionary
+    active_users[user_id] = update.effective_user.first_name
 
     # Check if there are other active users to challenge
     if len(active_users) < 2:
         await update.message.reply_text("Waiting for another player to join. Please try again later.")
         return
 
-    # Remove the current user from the list of potential opponents
-    potential_opponents = list(active_users - {user_id})
+    # Get the opponent
+    opponent_id = next(iter(active_users.keys()))  # Get the first user in the dictionary
+    opponent_name = active_users[opponent_id]
 
-    # Randomly select an opponent
-    opponent_id = random.choice(potential_opponents)
-
+    # Notify both players
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=f"You have been challenged by {opponent_name} for a 1v1 match! You will start in 10 seconds."
+    )
     await context.bot.send_message(
         chat_id=opponent_id,
-        text=f"You have been challenged by {update.effective_user.first_name} for a 1v1 match! Type /accept to join."
+        text=f"You have been challenged by {update.effective_user.first_name} for a 1v1 match! You will start in 10 seconds."
     )
-    await update.message.reply_text(f"Challenged {opponent_id} for a 1v1 match!")
 
-# --- /accept command ---
-async def accept_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    # Wait for 10 seconds
+    await asyncio.sleep(10)
 
-    if user_id not in active_users:
-        await update.message.reply_text("You have not been challenged. Please wait for a challenge.")
-        return
+    # Start the game
+    await start_game(chat_id, user_id, opponent_id)
 
-    # Remove the user from active users to prevent multiple challenges
-    active_users.remove(user_id)
-
-    # Get the challenger (the user who sent the challenge)
-    challenger_id = next(iter(active_users))  # Get the first user in the set
-    active_users.remove(challenger_id)  # Remove the challenger from the set
-
-    # Initialize game state
+# --- Start Game ---
+async def start_game(chat_id, user_id, opponent_id):
     word = random.choice(WORDS)
     hint = f"Starts with '{word[0]}'"
 
-    # Create a game entry for both players
     games_col.update_one(
         {"chat_id": chat_id},
         {"$set": {
@@ -290,22 +235,12 @@ async def accept_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "hint": hint,
             "guesses": [],
             "start_time": datetime.utcnow(),
-            "players": [user_id, challenger_id]  # Store both player IDs
+            "players": [user_id, opponent_id]  # Store both player IDs
         }},
         upsert=True
     )
 
-    # Notify both players
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=f"Challenge accepted! You are playing against {context.bot.get_chat_member(chat_id, challenger_id).user.first_name}. Guess the 4-letter word!"
-    )
-    await context.bot.send_message(
-        chat_id=challenger_id,
-        text=f"Challenge accepted! You are playing against {context.bot.get_chat_member(chat_id, user_id).user.first_name}. Guess the 4-letter word!"
-    )
-
-    await context.bot.send_message(chat_id=chat_id, text="Both players have joined the game! Start guessing the 4-letter word.")
+    await context.bot.send_message(chat_id=chat_id, text="Game started! Both players can start guessing the 4-letter word.")
 
 # --- Handle guesses ---
 async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -336,7 +271,9 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guesses.append(text)
     games_col.update_one({"chat_id": chat_id}, {"$set": {"guesses": guesses}})
     feedback = format_feedback(text, correct_word)
-    await update.message.reply_text(f"{feedback} {text}", parse_mode="Markdown")
+
+    # Send feedback to all players
+    await context.bot.send_message(chat_id=chat_id, text=f"{feedback} {text} by {user.first_name}", parse_mode="Markdown")
 
     if text == correct_word:
         now = datetime.utcnow()
@@ -415,7 +352,11 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text("No scores found.")
         return
 
-    msg = f
+    msg = f"__{title}__\n"
+    for idx, row in enumerate(results, 1):
+        msg += f"> {idx}. *{row['name']}* — {row['score']} pts\n"
+
+    await query.edit_message_text(msg, parse_mode="Markdown")
 
 # --- Main ---
 if __name__ == "__main__":
@@ -426,8 +367,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("stop", stop_game))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
     app.add_handler(CommandHandler("search", search_opponent))
-    app.add_handler(CommandHandler("accept", accept_challenge))  # New command# New command
-    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^lb_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_guess))
 
     print("Bot is running...")
