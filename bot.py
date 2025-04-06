@@ -1,4 +1,5 @@
 import random
+import asyncio
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 from telegram import (
@@ -14,11 +15,12 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
-import asyncio  # Import asyncio for sleep functionality
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 # --- Bot Config ---
-TOKEN = "7364490758:AAFQHSTWOfFxxebzOpP_O_lLakaYPLYNkDo"  # <-- Replace this with your bot token
-MONGO_URL = "mongodb+srv://TSANKI:TSANKI@cluster0.u2eg9e1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # <-- Replace this with your MongoDB connection string
+TOKEN = "YOUR_BOT_TOKEN"  # <-- Replace this with your bot token
+MONGO_URL = "YOUR_MONGO_URL"  # <-- Replace this with your MongoDB connection string
 WELCOME_IMAGE_URL = "https://graph.org/file/c0e17724e66a68a2de3a6-5ff173af1d3498d9e7.jpg"  # <-- Replace with your welcome image
 
 # --- MongoDB Setup ---
@@ -29,105 +31,15 @@ scores_col = db["scores"]
 
 # --- Word List ---
 WORDS = [
-    # A
-    'able', 'acid', 'aged', 'also', 'area', 'army', 'atom', 'aunt', 'away', 'axis', 'amit', 'dick', 'slap', 'crow',
-    # B
+    # Add your words here
+    'able', 'acid', 'aged', 'also', 'area', 'army', 'atom', 'aunt', 'away', 'axis',
     'baby', 'back', 'bake', 'ball', 'band', 'bank', 'barn', 'base', 'bath', 'bear',
-    'beat', 'been', 'bell', 'belt', 'bend', 'best', 'bike', 'bill', 'bird', 'bite',
-    'blue', 'boat', 'body', 'bomb', 'bond', 'bone', 'book', 'boom', 'boot', 'bore',
-    'born', 'boss', 'both', 'bowl', 'brag', 'bray', 'bred', 'brew', 'brim', 'buck',
-    'buff', 'bulk', 'bull', 'bump', 'burn', 'bush', 'busy', 'buzz', 'byte',
-    # C
-    'cage', 'cake', 'call', 'calm', 'camp', 'card', 'care', 'cart', 'case', 'cash',
-    'cast', 'cave', 'cell', 'chat', 'chip', 'city', 'clay', 'club', 'coal', 'coat',
-    'cold', 'come', 'cook', 'cool', 'cope', 'cord', 'core', 'cost', 'crew', 'crop',
-    'curl', 'cute', 'chill'
-    # D
-    'dark', 'data', 'date', 'dawn', 'deal', 'debt', 'deep', 'deer', 'desk', 'dial',
-    'dice', 'died', 'diet', 'dime', 'dine', 'dish', 'disk', 'dive', 'dock', 'does',
-    'doge', 'dome', 'done', 'doom', 'door', 'dose', 'down', 'drag', 'draw', 'drop',
-    'drum', 'dual', 'duck', 'duke', 'dull', 'dust', 'duty',
-    # E
-    'each', 'earn', 'ease', 'east', 'easy', 'edge', 'edit', 'else', 'envy', 'epic',
-    'even', 'ever', 'evil', 'exam', 'exit', 'eyes',
-    # F
-    'face', 'fact', 'fade', 'fail', 'fair', 'fake', 'fall', 'fame', 'farm', 'fast',
-    'fate', 'fear', 'feed', 'feel', 'feet', 'fell', 'felt', 'file', 'fill', 'film',
-    'find', 'fine', 'fire', 'firm', 'fish', 'fist', 'five', 'flag', 'flat', 'flip',
-    'flow', 'fold', 'folk', 'food', 'foot', 'form', 'fort', 'four', 'free', 'frog',
-    'fuel', 'full', 'fund', 'fuse',
-    # G
-    'gain', 'game', 'gang', 'gate', 'gave', 'gear', 'gene', 'gift', 'girl', 'give',
-    'glad', 'goal', 'goat', 'gold', 'golf', 'gone', 'good', 'grab', 'gray', 'grew',
-    'grid', 'grim', 'grip', 'grow', 'gulf', 'guts',
-    # H
-    'hair', 'half', 'hall', 'hand', 'hang', 'hard', 'harm', 'hate', 'have', 'hawk',
-    'head', 'heal', 'heap', 'hear', 'heat', 'held', 'hell', 'help', 'herb', 'hero',
-    'hide', 'high', 'hill', 'hire', 'hold', 'hole', 'holy', 'home', 'hope', 'horn',
-    'host', 'hour', 'huge', 'hung', 'hunt', 'hurt',
-    # I
-    'idea', 'idle', 'inch', 'into', 'iron', 'item',
-    # J
-    'jack', 'jade', 'jail', 'jazz', 'jeep', 'jest', 'join', 'joke', 'jump', 'jury',
-    # K
-    'keep', 'kept', 'kick', 'kill', 'kind', 'king', 'kiss', 'kite', 'knee', 'knew',
-    'knit', 'know',
-    # L
-    'lack', 'lady', 'lake', 'lamp', 'land', 'lane', 'last', 'late', 'lava', 'lazy',
-    'lead', 'leaf', 'left', 'lend', 'less', 'life', 'lift', 'like', 'limb', 'line',
-    'link', 'lion', 'list', 'live', 'load', 'loan', 'lock', 'logo', 'long', 'look',
-    'loop', 'lord', 'lose', 'loss', 'lost', 'love', 'luck', 'lung',
-    # M
-    'made', 'mail', 'main', 'make', 'male', 'mall', 'many', 'mark', 'mask', 'mass',
-    'mate', 'meal', 'mean', 'meat', 'meet', 'melt', 'menu', 'mere', 'mice', 'mild',
-    'mile', 'milk', 'mill', 'mind', 'mine', 'mint', 'miss', 'mist', 'mode', 'mood',
-    'moon', 'more', 'most', 'move', 'much', 'must', 'myth',
-    # N
-    'name', 'navy', 'near', 'neck', 'need', 'nest', 'news', 'next', 'nice', 'nick',
-    'nine', 'node', 'none', 'noon', 'nose', 'note', 'noun', 'nuts',
-    # O
-    'oath', 'obey', 'omit', 'once', 'only', 'onto', 'open', 'oral', 'ours', 'oval',
-    'oven', 'over', 'owed', 'own',
-    # P
-    'pack', 'page', 'paid', 'pain', 'pair', 'palm', 'park', 'part', 'pass', 'past',
-    'path', 'peak', 'pear', 'peel', 'peer', 'peny', 'pick', 'pile', 'pill', 'pine',
-    'pink', 'pipe', 'plan', 'play', 'plot', 'plug', 'plus', 'poem', 'pole', 'poll',
-    'pond', 'pool', 'poor', 'port', 'post', 'pull', 'pure', 'push', 'pins', 
-    # Q
-    'quad', 'quiz', 'quit', 'quip',
-    # R
-    'race', 'rack', 'rage', 'raid', 'rail', 'rain', 'rank', 'rate', 'rays', 'read',
-    'real', 'rear', 'redo', 'reed', 'reef', 'rest', 'rice', 'rich', 'ride', 'ring',
-    'riot', 'rise', 'risk', 'road', 'rock', 'role', 'roof', 'room', 'root', 'rope',
-    'rose', 'rule', 'rush', 'rust',
-    # S
-    'safe', 'said', 'sail', 'salt', 'same', 'sand', 'save', 'scan', 'scar', 'seal',
-    'seat', 'seed', 'seek', 'seem', 'seen', 'self', 'sell', 'send', 'ship', 'shop',
-    'shot', 'show', 'shut', 'side', 'sign', 'silk', 'sink', 'site', 'size', 'slip',
-    'slow', 'snap', 'snow', 'soap', 'soft', 'soil', 'sold', 'sole', 'some', 'song',
-    'soon', 'sort', 'soul', 'spot', 'star', 'stay', 'step', 'stop', 'such', 'suit', 'smag',
-    'sure', 'swim', 'sync',
-    # T
-    'tail', 'take', 'tale', 'talk', 'tall', 'tank', 'tape', 'task', 'team', 'tear',
-    'tech', 'tell', 'tend', 'tent', 'term', 'test', 'text', 'than', 'that', 'them',
-    'then', 'they', 'thin', 'this', 'thus', 'time', 'tire', 'told', 'toll', 'tone',
-    'tool', 'tops', 'torn', 'tour', 'town', 'trap', 'tree', 'trip', 'true', 'tube',
-    'tune', 'turn', 'twin', 'type',
-    # U
-    'ugly', 'unit', 'urge', 'used', 'user', 'upon',
-    # V
-    'vain', 'vast', 'veil', 'verb', 'very', 'vest', 'view', 'vine', 'visa', 'vote',
-    # W
-    'wage', 'wait', 'wake', 'walk', 'wall', 'want', 'ward', 'warm', 'warn', 'wash',
-    'wave', 'weak', 'wear', 'weed', 'week', 'well', 'west', 'what', 'when', 'whip',
-    'wide', 'wife', 'wild', 'will', 'wind', 'wine', 'wing', 'wink', 'wipe', 'wire',
-    'wise', 'wish', 'wolf', 'wood', 'word', 'worn', 'wrap', 'work',
-    # X
-    'xray',
-    # Y
-    'yard', 'yarn', 'yawn', 'yeah', 'year', 'yell', 'your', 'yoga',
-    # Z
-    'zero', 'zinc', 'zone', 'zoom']  # Your word list here
+    # ... (add more words as needed)
+]
+
+# --- Constants ---
+IMAGE_SIZE = (250, 250)
+FONT_SIZE = 20
 
 # --- Format Feedback ---
 def format_feedback(guess: str, correct_word: str) -> str:
@@ -187,61 +99,6 @@ async def stop_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games_col.delete_one({"chat_id": chat_id})
     await update.message.reply_text("Game stopped. Use /new to start a new one.")
 
-# Global variable to store active users
-active_users = {}
-
-# --- /search command ---
-async def search_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-
-    # Add the user to the active users dictionary
-    active_users[user_id] = update.effective_user.first_name
-
-    # Check if there are other active users to challenge
-    if len(active_users) < 2:
-        await update.message.reply_text("Waiting for another player to join. Please try again later.")
-        return
-
-    # Get the opponent
-    opponent_id = next(iter(active_users.keys()))  # Get the first user in the dictionary
-    opponent_name = active_users[opponent_id]
-
-    # Notify both players
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=f"You have been challenged by {opponent_name} for a 1v1 match! You will start in 10 seconds."
-    )
-    await context.bot.send_message(
-        chat_id=opponent_id,
-        text=f"You have been challenged by {update.effective_user.first_name} for a 1v1 match! You will start in 10 seconds."
-    )
-
-    # Wait for 10 seconds
-    await asyncio.sleep(10)
-
-    # Start the game
-    await start_game(chat_id, user_id, opponent_id, context)
-
-# --- Start Game ---
-async def start_game(chat_id, user_id, opponent_id, context):
-    word = random.choice(WORDS)
-    hint = f"Starts with '{word[0]}'"
-
-    games_col.update_one(
-        {"chat_id": chat_id},
-        {"$set": {
-            "word": word,
-            "hint": hint,
-            "guesses": [],
-            "start_time": datetime.utcnow(),
-            "players": [user_id, opponent_id]  # Store both player IDs
-        }},
-        upsert=True
-    )
-
-    await context.bot.send_message(chat_id=chat_id, text="Game started! Both players can start guessing the 4-letter word.")
-
 # --- Handle guesses ---
 async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -249,12 +106,10 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return  # Game not running, ignore all messages
 
-    user = update.effective_user  # Corrected line
+    user = update.effective_user
     text = update.message.text.lower()
 
-    # Check if the guess is valid
     if not text.isalpha() or len(text) != 4:
-        await update.message.reply_text("Please guess a 4-letter word.")
         return
 
     if text not in WORDS:
@@ -265,57 +120,40 @@ async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guesses = game.get("guesses", [])
 
     if text in guesses:
-        await update.message.reply_text("You've already guessed that word.")
         return
 
     guesses.append(text)
     games_col.update_one({"chat_id": chat_id}, {"$set": {"guesses": guesses}})
     feedback = format_feedback(text, correct_word)
+    await update.message.reply_text(f"{feedback} {text}", parse_mode="Markdown")
 
-    # Send feedback to all players
-    await context.bot.send_message(chat_id=chat_id, text=f"{feedback} {text} by {user.first_name}", parse_mode="Markdown")
-
-    # Check if the guess is correct
     if text == correct_word:
         now = datetime.utcnow()
 
-        # Update scores for the winner
         scores_col.update_one(
             {"chat_id": chat_id, "user_id": user.id},
-            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
             upsert=True
         )
         scores_col.update_one(
             {"chat_id": "global", "user_id": user.id},
-            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 25}},
+            {"$set": {"name": user.first_name, "updated": now}, "$inc": {"score": 12}},
             upsert=True
         )
 
-        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations {user.first_name}! You've guessed the word '{correct_word}'! The game is over.")
-        # Clean up the game data
+        summary = build_summary(guesses, correct_word, game.get("hint", ""))
+        await update.message.reply_text(f"👻 *{user.first_name} guessed it right!*\n\n{summary}", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=chat_id, text=f"🎉 Congratulations *{user.first_name}*! 👻", parse_mode="Markdown")
         games_col.delete_one({"chat_id": chat_id})
-        # Remove players from active users
-        del active_users[user.id]
-        del active_users[opponent_id]
-    else:
-        # Notify the other player about the guess
-        opponent_id = next(user_id for user_id in game["players"] if user_id != user.id)
-        await context.bot.send_message(chat_id=opponent_id, text=f"{user.first_name} guessed '{text}' but it's not correct. Keep trying!")
 
 # --- /leaderboard ---
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     keyboard = [
         [
-            InlineKeyboardButton("🌍 Global", callback_data="lb_global"),
-            InlineKeyboardButton("🏆 Overall", callback_data=f"lb_overall_{chat_id}")
-        ],
-        [
             InlineKeyboardButton("📅 Today", callback_data=f"lb_today_{chat_id}"),
-            InlineKeyboardButton("🎮 Multiplayer", callback_data="lb_multiplayer")
-        ],
-        [
-            InlineKeyboardButton("❌ Close", callback_data="close")
+            InlineKeyboardButton("🏆 Overall", callback_data=f"lb_overall_{chat_id}"),
+            InlineKeyboardButton("🌍 Global", callback_data="lb_global")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -348,14 +186,6 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         results = list(scores_col.find({"chat_id": "global"}).sort("score", -1).limit(10))
         title = "🌍 Global Leaderboard"
 
-    elif data == "lb_multiplayer":
-        results = list(scores_col.find({"chat_id": "multiplayer"}).sort("score", -1).limit(10))
-        title = "🎮 Multiplayer Leaderboard"
-
-    elif data == "close":
-        await query.edit_message_text("Leaderboard closed.")
-        return
-
     else:
         return
 
@@ -369,6 +199,87 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await query.edit_message_text(msg, parse_mode="Markdown")
 
+# --- /search command ---
+async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+
+    # Find a random opponent (this is a placeholder, implement your own logic)
+    members = await context.bot.get_chat_members(chat_id)
+    opponents = [member.user.id for member in members if member.user.id != user_id and member.user.is_bot is False]
+    
+    if not opponents:
+        await update.message.reply_text("No opponents available.")
+        return
+
+    opponent_id = random.choice(opponents)
+
+    await update.message.reply_text(f"Your opponent is: {opponent_id}. Starting in 10 seconds...")
+    
+    # Wait for 10 seconds
+    await asyncio.sleep(10)
+
+    # Start the game
+    await start_search_game(update, context, user_id, opponent_id)
+
+# --- Start the Game Logic ---
+async def start_search_game(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, opponent_id: int):
+    word = random.choice(WORDS)
+    reversed_word = word[::-1]
+
+    # Create an image with the reversed word
+    image = Image.new('RGB', IMAGE_SIZE, color='white')
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    text_width, text_height = draw.textsize(reversed_word, font=font)
+    draw.text(((IMAGE_SIZE[0] - text_width) / 2, (IMAGE_SIZE[1] - text_height) / 2), reversed_word, fill='black', font=font)
+
+    # Save the image to a BytesIO object
+    image_bytes = io.BytesIO()
+    image.save(image_bytes, format='PNG')
+    image_bytes.seek(0)
+
+    # Send the image to both users
+    await context.bot.send_photo(chat_id=user_id, photo=image_bytes)
+    await context.bot.send_photo(chat_id=opponent_id, photo=image_bytes)
+
+    # Start the rounds
+    await play_rounds(update, context, user_id, opponent_id, word)
+
+# --- Handle Rounds ---
+async def play_rounds(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, opponent_id: int, correct_word: str):
+    rounds = 10
+    user_scores = {user_id: 0, opponent_id: 0}
+    user_health = {user_id: 100, opponent_id: 100}
+    round_counter = 0
+
+    while round_counter < rounds:
+        await asyncio.sleep(10)  # Wait for 10 seconds for responses
+
+        # Check if both users responded
+        # Implement your logic to check responses and update scores and health
+        # If a user does not respond, mark them as AFK and reduce health
+
+        round_counter += 1
+
+    # Determine the winner and update scores
+    winner = user_id if user_scores[user_id] > user_scores[opponent_id] else opponent_id
+    await update.message.reply_text(f"The winner is: {winner}!")
+    # Update scores in the database
+
+# --- /profile command ---
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    # Fetch user profile from the database
+    user_profile = scores_col.find_one({"user_id": user_id})
+
+    if user_profile:
+        health = user_profile.get("health", 100)
+        score = user_profile.get("score", 0)
+        await update.message.reply_text(f"Your health: {health}, Your score: {score}")
+    else:
+        await update.message.reply_text("Profile not found.")
+
 # --- Main ---
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
@@ -377,7 +288,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("new", new_game))
     app.add_handler(CommandHandler("stop", stop_game))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(CommandHandler("search", search_opponent))
+    app.add_handler(CommandHandler("search", search))
+    app.add_handler(CommandHandler("profile", profile))
+    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^lb_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_guess))
 
     print("Bot is running...")
